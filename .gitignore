@@ -1,0 +1,11 @@
+.dev_env
+.vscode
+
+*.pyc
+*.ipynb
+
+.ipynb_checkpoints
+__pycache__
+
+results
+runs

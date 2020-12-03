@@ -1,0 +1,16 @@
+funcy
+kornia
+numpy
+opencv-python
+Pillow
+PyYAML
+pydicom
+pymongo
+sacred
+scikit-learn
+scikit-image
+tensorboardX
+torch
+torchvision
+tqdm
+ujson
