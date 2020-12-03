@@ -14,3 +14,5 @@ torch
 torchvision
 tqdm
 ujson
+
+git+git@github.com:vribeiro1/torchtools.git
