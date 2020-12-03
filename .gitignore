@@ -7,5 +7,8 @@
 .ipynb_checkpoints
 __pycache__
 
+config/*
+!config/config.yaml.example
+
 results
 runs
