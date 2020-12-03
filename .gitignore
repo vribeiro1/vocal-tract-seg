@@ -3,6 +3,7 @@
 
 *.pyc
 *.ipynb
+*.out
 
 .ipynb_checkpoints
 __pycache__
