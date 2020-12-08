@@ -67,6 +67,7 @@ def run_epoch(phase, epoch, model, dataloader, optimizer, criterion, writer=None
     for i, (fpaths, inputs, targets, masks) in enumerate(progress_bar):
         inputs = inputs.to(device)
         targets = targets.to(device)
+        masks = masks.to(device)
 
         outputs = model(inputs)["out"]
         bs, c, h, w = outputs.shape
