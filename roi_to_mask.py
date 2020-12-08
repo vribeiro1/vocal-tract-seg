@@ -47,6 +47,6 @@ for subject_id, sequences in data.items():
                     # Target mask was already generated
                     continue
 
-                mask_tensor = VocalTractDataset.roi_to_mask_tensor(roi, (136, 136))
+                mask_tensor = VocalTractDataset.roi_to_target_tensor(roi, (136, 136))
                 mask_img = topil(mask_tensor)
                 mask_img.save(img_fpath)

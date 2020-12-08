@@ -207,21 +207,3 @@ class VocalTractDataset(Dataset):
         mask = self.create_mask(target, missing)
 
         return dcm_fpath, img_arr, target, mask
-
-
-if __name__ == "__main__":
-    import yaml
-
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    config_fpath = os.path.join(base_dir, "config", "config.yaml")
-    with open(config_fpath) as f:
-        config = yaml.safe_load(f)
-
-    dataset = VocalTractDataset(
-        config["datadir"],
-        config["train_sequences"],
-        config["classes"]
-    )
-    print(f"Dataset size: {len(dataset)} instances")
-
-    pdb.set_trace()

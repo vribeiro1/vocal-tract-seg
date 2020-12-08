@@ -70,7 +70,7 @@ def run_epoch(phase, epoch, model, dataloader, optimizer, criterion, writer=None
 
         outputs = model(inputs)["out"]
         bs, c, h, w = outputs.shape
-        prob_outputs = torch.softmax(outputs, dim=1)
+        prob_outputs = torch.sigmoid(outputs)
         loss = criterion(outputs, targets, masks)
 
         if training:
@@ -96,7 +96,7 @@ def run_epoch(phase, epoch, model, dataloader, optimizer, criterion, writer=None
 
 
 @ex.automain
-def main(_run, datadir, batch_size, n_epochs, patience, learning_rate,
+def main(_run, architecture, datadir, batch_size, n_epochs, patience, learning_rate,
          train_sequences, valid_sequences, test_sequences, classes, state_dict_fpath=None):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     num_classes = len(classes)
@@ -111,7 +111,7 @@ def main(_run, datadir, batch_size, n_epochs, patience, learning_rate,
 
     model, info = load_model(
         "segmentation",
-        "deeplabv3",
+        architecture,
         num_classes=num_classes,
         pretrained=True
     )
