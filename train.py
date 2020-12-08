@@ -200,13 +200,13 @@ def main(_run, architecture, datadir, batch_size, n_epochs, patience, learning_r
         worker_init_fn=set_seeds
     )
 
-    best_model_state_dict = torch.load(best_model_path, map_location=device)
     best_model, info = load_model(
         "segmentation",
         "deeplabv3",
         num_classes=num_classes,
-        pretrained=False
+        pretrained=True
     )
+    best_model_state_dict = torch.load(best_model_path, map_location=device)
     best_model.load_state_dict(best_model_state_dict)
     best_model = best_model.to(device)
 
