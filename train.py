@@ -226,7 +226,7 @@ def main(_run, architecture, datadir, batch_size, n_epochs, patience, learning_r
 
     best_model, info = load_model(
         "segmentation",
-        "deeplabv3",
+        architecture,
         num_classes=num_classes,
         pretrained=True
     )
