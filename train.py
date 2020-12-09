@@ -98,7 +98,8 @@ def run_epoch(phase, epoch, model, dataloader, optimizer, criterion, writer=None
 
 @ex.automain
 def main(_run, architecture, datadir, batch_size, n_epochs, patience, learning_rate,
-         train_sequences, valid_sequences, test_sequences, classes, state_dict_fpath=None):
+         train_sequences, valid_sequences, test_sequences, classes, size,
+         state_dict_fpath=None):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     num_classes = len(classes)
 
@@ -135,7 +136,7 @@ def main(_run, architecture, datadir, batch_size, n_epochs, patience, learning_r
 
     loss_fn = MaskedBCEWithLogitsLoss()
 
-    train_dataset = VocalTractDataset(datadir, train_sequences, classes)
+    train_dataset = VocalTractDataset(datadir, train_sequences, classes, size=size)
     train_dataloader = DataLoader(
         train_dataset,
         batch_size=batch_size,
@@ -143,7 +144,7 @@ def main(_run, architecture, datadir, batch_size, n_epochs, patience, learning_r
         worker_init_fn=set_seeds
     )
 
-    valid_dataset = VocalTractDataset(datadir, valid_sequences, classes)
+    valid_dataset = VocalTractDataset(datadir, valid_sequences, classes, size=size)
     valid_dataloader = DataLoader(
         valid_dataset,
         batch_size=batch_size,
@@ -192,7 +193,7 @@ def main(_run, architecture, datadir, batch_size, n_epochs, patience, learning_r
         if epochs_since_best > patience:
             break
 
-    test_dataset = VocalTractDataset(datadir, test_sequences, classes)
+    test_dataset = VocalTractDataset(datadir, test_sequences, classes, size=size)
     test_dataloader = DataLoader(
         test_dataset,
         batch_size=batch_size,
