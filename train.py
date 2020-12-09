@@ -17,6 +17,10 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 from tqdm import tqdm
 
+from augmentations import (MultiCompose,
+                           MultiRandomHorizontalFlip,
+                           MultiRandomRotation,
+                           MultiRandomVerticalFlip)
 from loss import MaskedBCEWithLogitsLoss
 from dataset import VocalTractDataset
 from torchtools.models import load_model
@@ -131,22 +135,39 @@ def main(_run, architecture, datadir, batch_size, n_epochs, patience, learning_r
     max_lr = learning_rate * 10
     scheduler = CyclicLR(
         optimizer,
-        base_lr=learning_rate/10,
-        max_lr=10*learning_rate,
+        base_lr=base_lr,
+        max_lr=max_lr,
         cycle_momentum=False
     )
 
     loss_fn = MaskedBCEWithLogitsLoss()
 
-    train_dataset = VocalTractDataset(datadir, train_sequences, classes, size=size)
+    augmentations = MultiCompose([
+        MultiRandomHorizontalFlip(),
+        MultiRandomVerticalFlip(),
+        MultiRandomRotation([-5, 5]),
+    ])
+
+    train_dataset = VocalTractDataset(
+        datadir,
+        train_sequences,
+        classes,
+        size=size,
+        augmentations=augmentations
+    )
     train_dataloader = DataLoader(
         train_dataset,
         batch_size=batch_size,
-        shuffle=False,
+        shuffle=True,
         worker_init_fn=set_seeds
     )
 
-    valid_dataset = VocalTractDataset(datadir, valid_sequences, classes, size=size)
+    valid_dataset = VocalTractDataset(
+        datadir,
+        valid_sequences,
+        classes,
+        size=size
+    )
     valid_dataloader = DataLoader(
         valid_dataset,
         batch_size=batch_size,

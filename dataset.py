@@ -9,7 +9,6 @@ import pydicom
 import torch
 
 from glob import glob
-from kornia.geometry import Resize
 from kornia.augmentation import Normalize
 from PIL import Image
 from scipy import interpolate
@@ -23,7 +22,7 @@ ROI = "roi"
 
 
 class VocalTractDataset(Dataset):
-    def __init__(self, datadir, subj_sequences, classes, size=(224, 224), annotation=MASK):
+    def __init__(self, datadir, subj_sequences, classes, size=(224, 224), annotation=MASK, augmentations=None):
         if annotation not in [MASK, ROI]:
             raise ValueError(f"Annotation level should be either '{MASK}' or {ROI}")
 
@@ -46,16 +45,14 @@ class VocalTractDataset(Dataset):
         self.classes = sorted(classes)
 
         self.to_tensor = transforms.ToTensor()
-        self.normalize = Normalize(
+        self.normalize = transforms.Normalize(
             mean=torch.tensor([0.485, 0.456, 0.406]),
             std=torch.tensor([0.229, 0.224, 0.225])
         )
 
         self.annotation = annotation
-        if annotation == ROI:
-            self.resize = Resize(size)
-        else:
-            self.resize = transforms.Resize(size)
+        self.resize = transforms.Resize(size)
+        self.augmentations = augmentations
 
     @staticmethod
     def _collect_data(datadir, sequences, classes):
@@ -144,7 +141,7 @@ class VocalTractDataset(Dataset):
 
         return target_arr
 
-    def create_target(self, rois):
+    def create_target(self, rois, original_size):
         targets = []
         missing = []
 
@@ -155,11 +152,11 @@ class VocalTractDataset(Dataset):
                 target_arr = torch.zeros(self.resize.size)
                 missing.append(i)
             else:
-                target_arr = self.roi_to_target_tensor(roi, self.resize.size)
+                target_arr = self.roi_to_target_tensor(roi, original_size)
+                target_arr = self.resize(target_arr)
             targets.append(target_arr)
 
-        target = self.resize(torch.stack(targets).unsqueeze(0)).squeeze(0)
-
+        target = torch.stack(targets)
         return target.float(), missing
 
     def load_target(self, targets_fpaths):
@@ -179,7 +176,6 @@ class VocalTractDataset(Dataset):
             targets.append(target_arr)
 
         target = torch.stack(targets)
-
         return target.float(), missing
 
     def create_mask(self, target, missing_indices):
@@ -195,15 +191,14 @@ class VocalTractDataset(Dataset):
         dcm_fpath = data_item["dcm_filepath"]
         img = self.read_dcm(dcm_fpath)
 
+        img_arr = self.to_tensor(self.resize(img))
         if self.annotation == ROI:
-            img_arr = self.to_tensor(img)
-            img_arr = self.resize(img_arr.unsqueeze(0)).squeeze(0)
-            target, missing = self.create_target(data_item["rois"])
+            target, missing = self.create_target(data_item["rois"], img.size)
         else:
-            img_arr = self.to_tensor(self.resize(img))
             target, missing = self.load_target(data_item["seg_masks"])
 
         img_arr = self.normalize(img_arr)
         mask = self.create_mask(target, missing)
 
+        img_arr, target, mask = self.augmentations(img_arr, target, mask)
         return dcm_fpath, img_arr, target, mask
