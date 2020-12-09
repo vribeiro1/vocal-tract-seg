@@ -200,5 +200,7 @@ class VocalTractDataset(Dataset):
         img_arr = self.normalize(img_arr)
         mask = self.create_mask(target, missing)
 
-        img_arr, target, mask = self.augmentations(img_arr, target, mask)
+        if self.augmentations:
+            img_arr, target, mask = self.augmentations(img_arr, target, mask)
+
         return dcm_fpath, img_arr, target, mask
