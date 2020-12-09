@@ -69,14 +69,16 @@ def run_epoch(phase, epoch, model, dataloader, optimizer, criterion, writer=None
         targets = targets.to(device)
         masks = masks.to(device)
 
-        outputs = model(inputs)["out"]
-        bs, c, h, w = outputs.shape
-        prob_outputs = torch.sigmoid(outputs)
-        loss = criterion(outputs, targets, masks)
+        optimizer.zero_grad()
+        with torch.set_grad_enabled(training):
+            outputs = model(inputs)
+            bs, c, h, w = outputs.shape
+            prob_outputs = torch.sigmoid(outputs)
+            loss = criterion(outputs, targets, masks)
 
-        if training:
-            loss.backward()
-            optimizer.step()
+            if training:
+                loss.backward()
+                optimizer.step()
 
         if epoch_outputs_dir:
             fnames = funcy.lmap(lambda fpath: os.path.basename(fpath).split(".")[0], fpaths)
