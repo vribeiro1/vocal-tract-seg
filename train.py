@@ -21,7 +21,7 @@ from augmentations import (MultiCompose,
                            MultiRandomHorizontalFlip,
                            MultiRandomRotation,
                            MultiRandomVerticalFlip)
-from loss import MaskedBCEWithLogitsLoss
+from loss import MaskedBCEWithLogitsLoss, DiceLoss
 from dataset import VocalTractDataset
 from torchtools.models import load_model
 from settings import BASE_DIR
@@ -75,7 +75,7 @@ def run_epoch(phase, epoch, model, dataloader, optimizer, criterion, writer=None
 
         optimizer.zero_grad()
         with torch.set_grad_enabled(training):
-            outputs = model(inputs)
+            outputs = model(inputs)["out"]
             bs, c, h, w = outputs.shape
             prob_outputs = torch.sigmoid(outputs)
             loss = criterion(outputs, targets, masks)
@@ -140,7 +140,7 @@ def main(_run, architecture, datadir, batch_size, n_epochs, patience, learning_r
         cycle_momentum=False
     )
 
-    loss_fn = MaskedBCEWithLogitsLoss()
+    loss_fn = DiceLoss()
 
     augmentations = MultiCompose([
         MultiRandomHorizontalFlip(),

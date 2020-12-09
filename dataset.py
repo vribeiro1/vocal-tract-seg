@@ -82,8 +82,8 @@ class VocalTractDataset(Dataset):
                     "seg_masks": targets
                 }
 
-                is_none = lambda x: x is None
-                if all(map(is_none, rois)) and all(map(is_none, targets)):
+                is_none = lambda x: x[1] is None
+                if all(map(is_none, rois.items())) and all(map(is_none, targets.items())):
                     # Skip if all annotations are None
                     continue
 
