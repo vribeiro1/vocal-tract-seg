@@ -96,7 +96,7 @@ def run_epoch(phase, epoch, model, dataloader, optimizer, criterion, writer=None
     writer.add_scalar(loss_tag, mean_loss, epoch)
 
     info = {
-        "loss": np.mean(losses)
+        "loss": mean_loss
     }
 
     return info
