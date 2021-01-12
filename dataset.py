@@ -16,6 +16,7 @@ from skimage.measure import regionprops
 from torch.utils.data import Dataset
 from torchvision import transforms
 
+from connect_points import uint16_to_uint8
 from read_roi import read_roi_zip
 
 MASK = "mask"
@@ -115,7 +116,7 @@ class VocalTractDataset(Dataset):
     @staticmethod
     def read_dcm(dcm_fpath):
         ds = pydicom.dcmread(dcm_fpath, force=True)
-        img = Image.fromarray(ds.pixel_array)
+        img = Image.fromarray(uint16_to_uint8(ds.pixel_array))
 
         return img.convert("RGB")
 
@@ -302,7 +303,7 @@ class VocalTractMaskRCNNDataset(Dataset):
     @staticmethod
     def read_dcm(dcm_fpath):
         ds = pydicom.dcmread(dcm_fpath, force=True)
-        img = Image.fromarray(ds.pixel_array)
+        img = Image.fromarray(uint16_to_uint8(ds.pixel_array))
 
         return img.convert("RGB")
 
