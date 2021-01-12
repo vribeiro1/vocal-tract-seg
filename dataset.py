@@ -229,7 +229,7 @@ class VocalTractMaskRCNNDataset(Dataset):
             raise Exception("Empty VocalTractMaskRCNNDataset")
 
         self.classes = sorted(classes)
-        self.classes_dict = {c: i for i, c in enumerate(self.classes)}
+        self.classes_dict = {c: i + 1 for i, c in enumerate(self.classes)}
 
         self.to_tensor = transforms.ToTensor()
         self.normalize = transforms.Normalize(
@@ -264,6 +264,7 @@ class VocalTractMaskRCNNDataset(Dataset):
                 item = {
                     "subject": subject,
                     "sequence": sequence,
+                    "instance_number": image_name,
                     "dcm_filepath": image_filepath,
                     "rois": rois,
                     "seg_masks": targets
@@ -366,6 +367,10 @@ class VocalTractMaskRCNNDataset(Dataset):
         return target.float(), missing
 
     @staticmethod
+    def create_background_mask(masks):
+        return 1 - torch.max(masks, dim=0)[0]
+
+    @staticmethod
     def get_box_from_mask_tensor(mask, margin=0):
         mask_np = mask.numpy().astype(np.uint8)
         props = regionprops(mask_np)
@@ -394,27 +399,34 @@ class VocalTractMaskRCNNDataset(Dataset):
         else:
             masks, missing = self.load_target(data_item["seg_masks"])
 
-        masks[masks >= 0.5] = 1.0
-        masks[masks < 0.5] = 0.0
+        masks[masks > 0.5] = 1.0
+        masks[masks <= 0.5] = 0.0
 
         img_arr = self.normalize(img_arr)
-
         if self.augmentations:
             img_arr, masks = self.augmentations(img_arr, masks)
 
-        image_id = torch.tensor([item], dtype=torch.int64)
-        boxes = torch.stack([self.get_box_from_mask_tensor(mask, margin=3) for mask in masks])
-        area = torch.tensor([self.calc_bounding_box_area(box) for box in boxes])
-        labels = torch.tensor(list(self.classes_dict.values()), dtype=torch.int64)
-        iscrowd = torch.zeros(len(self.classes), dtype=torch.uint8)
+        h, w = self.resize.size
+        boxes = torch.stack(
+            [torch.tensor([0., 0., h, w])] +
+            [self.get_box_from_mask_tensor(mask, margin=3) for mask in masks]
+        )
+        labels = torch.tensor([0] + list(self.classes_dict.values()), dtype=torch.int64)
+
+        background = self.create_background_mask(masks).unsqueeze(dim=0)
+        masks = torch.cat([background, masks])
 
         target_dict = {
             "boxes": boxes,  # (FloatTensor[N, 4]): the coordinates of the N bounding boxes in [x0, y0, x1, y1] format, ranging from 0 to W and 0 to H.
             "labels": labels,  # (Int64Tensor[N]): the label for each bounding box. 0 represents always the background class.
-            # "image_id": image_id,  # (Int64Tensor[1]): an image identifier. It should be unique between all the images in the dataset, and is used during evaluation.
-            # "area": area,  # (Tensor[N]): The area of the bounding box. This is used during evaluation with the COCO metric, to separate the metric scores between small, medium and large boxes.
-            # "iscrowd": iscrowd,  # (UInt8Tensor[N]): instances with iscrowd=True will be ignored during evaluation.
             "masks": masks,  # (UInt8Tensor[N, H, W]): The segmentation masks for each one of the objects.
         }
 
-        return img_arr, target_dict
+        info = {
+            "subject": data_item["subject"],
+            "sequence": data_item["sequence"],
+            "instance_number": data_item["instance_number"],
+            "dcm_filepath": dcm_fpath
+        }
+
+        return info, img_arr, target_dict

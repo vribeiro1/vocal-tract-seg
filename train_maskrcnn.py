@@ -22,7 +22,7 @@ from augmentations import (MultiCompose,
                            MultiRandomHorizontalFlip,
                            MultiRandomRotation,
                            MultiRandomVerticalFlip)
-from loss import MaskedBCEWithLogitsLoss, DiceLoss
+from copy import deepcopy
 from dataset import VocalTractMaskRCNNDataset
 from settings import BASE_DIR
 
@@ -49,7 +49,7 @@ def run_epoch(phase, epoch, model, dataloader, optimizer, writer=None, device=No
     losses = []
     model.train()
     progress_bar = tqdm(dataloader, desc=f"Epoch {epoch} - {phase}")
-    for i, (inputs, targets_dict) in enumerate(progress_bar):
+    for i, (_, inputs, targets_dict) in enumerate(progress_bar):
         inputs = inputs.to(device)
         targets_dict = [{
             k: v.to(device) for k, v in d.items()
@@ -91,7 +91,7 @@ def run_epoch(phase, epoch, model, dataloader, optimizer, writer=None, device=No
     return info
 
 
-def run_inference(epoch, model, dataloader, outputs_dir, class_map, device=None):
+def run_inference(epoch, model, dataloader, outputs_dir, class_map, threshold=None, device=None):
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -101,7 +101,9 @@ def run_inference(epoch, model, dataloader, outputs_dir, class_map, device=None)
 
     model.eval()
     progress_bar = tqdm(dataloader, desc=f"Epoch {epoch} - inference")
-    for i, (inputs, targets_dict) in enumerate(progress_bar):
+
+    return_outputs = []
+    for i, (info, inputs, targets_dict) in enumerate(progress_bar):
         inputs = inputs.to(device)
         targets_dict = [{
             k: v.to(device) for k, v in d.items()
@@ -110,7 +112,7 @@ def run_inference(epoch, model, dataloader, outputs_dir, class_map, device=None)
         with torch.set_grad_enabled(False):
             outputs = model(inputs, targets_dict)
 
-            for j, im_outputs in enumerate(outputs):
+            for j, (im_info, im_outputs) in enumerate(zip(info, outputs)):
                 zipped = list(zip(
                     im_outputs["boxes"],
                     im_outputs["labels"],
@@ -127,9 +129,13 @@ def run_inference(epoch, model, dataloader, outputs_dir, class_map, device=None)
 
                 for box, label, score, mask in detected:
                     x0, y0, x1, y1 = box
-                    pred_cls = class_map[label.item()]
 
-                    mask_arr = mask.squeeze(dim=0).cpu().numpy() * 255
+                    mask_arr = mask.squeeze(dim=0).cpu().numpy()
+                    if threshold is not None:
+                        mask_arr[mask_arr > threshold] = 1.
+                        mask_arr[mask_arr <= threshold] = 0.
+
+                    mask_arr = mask_arr * 255
                     mask_arr = mask_arr.astype(np.uint8)
                     mask_img = Image.fromarray(mask_arr).convert("RGB")
                     draw = ImageDraw.Draw(mask_img)
@@ -143,17 +149,39 @@ def run_inference(epoch, model, dataloader, outputs_dir, class_map, device=None)
 
                     draw.text((10, 10), "%.4f" % score, (0, 0, 255))
 
-                    mask_filepath = os.path.join(
+                    mask_dirname = os.path.join(
                         epoch_outputs_dir,
-                        f"{2 * i + j}_{pred_cls}.png"
+                        im_info["subject"],
+                        im_info["sequence"]
+                    )
+                    if not os.path.exists(mask_dirname):
+                        os.makedirs(mask_dirname)
+
+                    pred_cls = class_map[label.item()]
+                    mask_filepath = os.path.join(
+                        mask_dirname,
+                        f"{im_info['instance_number']}_{pred_cls}.png"
                     )
                     mask_img.save(mask_filepath)
 
+                    im_outputs_with_info = deepcopy(im_info)
+                    im_outputs_with_info.update({
+                        "box": [x0, y0, x1, y1],
+                        "label": label,
+                        "pred_cls": pred_cls,
+                        "score": score,
+                        "mask": mask.squeeze(dim=0).cpu().numpy()
+                    })
+                    return_outputs.append(im_outputs_with_info)
+
+    return return_outputs
+
 
 def collate_fn(batch):
-    inputs = torch.stack([b[0] for b in batch])
-    targets = [b[1] for b in batch]
-    return inputs, targets
+    info = [b[0] for b in batch]
+    inputs = torch.stack([b[1] for b in batch])
+    targets = [b[2] for b in batch]
+    return info, inputs, targets
 
 
 @ex.automain
@@ -260,7 +288,7 @@ def main(_run, datadir, batch_size, n_epochs, patience, learning_rate,
                 model=model,
                 dataloader=valid_dataloader,
                 device=device,
-                class_map=dict(enumerate(classes)),
+                class_map={i: c for c, i in valid_dataset.classes_dict.items()},
                 outputs_dir=outputs_dir
             )
         else:
@@ -299,6 +327,6 @@ def main(_run, datadir, batch_size, n_epochs, patience, learning_rate,
         model=best_model,
         dataloader=test_dataloader,
         device=device,
-        class_map=dict(enumerate(classes)),
+        class_map={i: c for c, i in test_dataset.classes_dict.items()},
         outputs_dir=outputs_dir
     )
