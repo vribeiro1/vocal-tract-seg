@@ -62,7 +62,6 @@ class VocalTractDataset(Dataset):
 
         for subject, sequence in sequences:
             images = glob(os.path.join(datadir, subject, sequence, "dicoms", "*.dcm"))
-
             for image_filepath in images:
                 image_dirname = os.path.dirname(os.path.dirname(image_filepath))
                 image_name = os.path.basename(image_filepath).rsplit(".", maxsplit=1)[0]
@@ -329,6 +328,13 @@ class VocalTractMaskRCNNDataset(Dataset):
         target_arr[res_x, res_y] = 1.0
 
         return target_arr
+
+    @staticmethod
+    def collate_fn(batch):
+        info = [b[0] for b in batch]
+        inputs = torch.stack([b[1] for b in batch])
+        targets = [b[2] for b in batch]
+        return info, inputs, targets
 
     def create_target(self, rois, original_size):
         targets = []

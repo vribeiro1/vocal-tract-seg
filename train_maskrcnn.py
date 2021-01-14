@@ -1,13 +1,12 @@
 import pdb
 
 import funcy
+import json
 import numpy as np
 import os
-import random
 import torch
 import torch.nn as nn
 
-from PIL import Image, ImageDraw
 from sacred import Experiment
 from sacred.observers import FileStorageObserver
 from tensorboardX import SummaryWriter
@@ -24,21 +23,13 @@ from augmentations import (MultiCompose,
                            MultiRandomVerticalFlip)
 from copy import deepcopy
 from dataset import VocalTractMaskRCNNDataset
-from settings import BASE_DIR
-
-TRAIN = "train"
-VALID = "validation"
-TEST = "test"
+from evaluation import run_evaluation, run_inference
+from helpers import set_seeds
+from settings import *
 
 ex = Experiment()
 fs_observer = FileStorageObserver.create(os.path.join(BASE_DIR, "results"))
 ex.observers.append(fs_observer)
-
-
-def set_seeds(worker_id):
-    seed = torch.initial_seed() % 2 ** 31
-    np.random.seed(seed + 1)
-    random.seed(seed + 2)
 
 
 def run_epoch(phase, epoch, model, dataloader, optimizer, writer=None, device=None):
@@ -91,99 +82,6 @@ def run_epoch(phase, epoch, model, dataloader, optimizer, writer=None, device=No
     return info
 
 
-def run_inference(epoch, model, dataloader, outputs_dir, class_map, threshold=None, device=None):
-    if device is None:
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    epoch_outputs_dir = os.path.join(outputs_dir, "inference", str(epoch))
-    if not os.path.exists(epoch_outputs_dir):
-        os.makedirs(epoch_outputs_dir)
-
-    model.eval()
-    progress_bar = tqdm(dataloader, desc=f"Epoch {epoch} - inference")
-
-    return_outputs = []
-    for i, (info, inputs, targets_dict) in enumerate(progress_bar):
-        inputs = inputs.to(device)
-        targets_dict = [{
-            k: v.to(device) for k, v in d.items()
-        } for d in targets_dict]
-
-        with torch.set_grad_enabled(False):
-            outputs = model(inputs, targets_dict)
-
-            for j, (im_info, im_outputs) in enumerate(zip(info, outputs)):
-                zipped = list(zip(
-                    im_outputs["boxes"],
-                    im_outputs["labels"],
-                    im_outputs["scores"],
-                    im_outputs["masks"]
-                ))
-
-                detected = []
-                for c_idx, c in class_map.items():
-                    art_list = funcy.lfilter(lambda t: t[1].item() == c_idx, zipped)
-                    if len(art_list) > 0:
-                        art = max(art_list, key=lambda t: t[2])
-                        detected.append(art)
-
-                for box, label, score, mask in detected:
-                    x0, y0, x1, y1 = box
-
-                    mask_arr = mask.squeeze(dim=0).cpu().numpy()
-                    if threshold is not None:
-                        mask_arr[mask_arr > threshold] = 1.
-                        mask_arr[mask_arr <= threshold] = 0.
-
-                    mask_arr = mask_arr * 255
-                    mask_arr = mask_arr.astype(np.uint8)
-                    mask_img = Image.fromarray(mask_arr).convert("RGB")
-                    draw = ImageDraw.Draw(mask_img)
-                    draw.line([
-                        (x0, y0),
-                        (x1, y0),
-                        (x1, y1),
-                        (x0, y1),
-                        (x0, y0)
-                    ], fill=(255, 0, 0), width=2)
-
-                    draw.text((10, 10), "%.4f" % score, (0, 0, 255))
-
-                    mask_dirname = os.path.join(
-                        epoch_outputs_dir,
-                        im_info["subject"],
-                        im_info["sequence"]
-                    )
-                    if not os.path.exists(mask_dirname):
-                        os.makedirs(mask_dirname)
-
-                    pred_cls = class_map[label.item()]
-                    mask_filepath = os.path.join(
-                        mask_dirname,
-                        f"{im_info['instance_number']}_{pred_cls}.png"
-                    )
-                    mask_img.save(mask_filepath)
-
-                    im_outputs_with_info = deepcopy(im_info)
-                    im_outputs_with_info.update({
-                        "box": [x0, y0, x1, y1],
-                        "label": label,
-                        "pred_cls": pred_cls,
-                        "score": score,
-                        "mask": mask.squeeze(dim=0).cpu().numpy()
-                    })
-                    return_outputs.append(im_outputs_with_info)
-
-    return return_outputs
-
-
-def collate_fn(batch):
-    info = [b[0] for b in batch]
-    inputs = torch.stack([b[1] for b in batch])
-    targets = [b[2] for b in batch]
-    return info, inputs, targets
-
-
 @ex.automain
 def main(_run, datadir, batch_size, n_epochs, patience, learning_rate,
          train_sequences, valid_sequences, test_sequences, classes, size,
@@ -233,7 +131,7 @@ def main(_run, datadir, batch_size, n_epochs, patience, learning_rate,
         batch_size=batch_size,
         shuffle=True,
         worker_init_fn=set_seeds,
-        collate_fn=collate_fn
+        collate_fn=dataset.collate_fn
     )
 
     valid_dataset = VocalTractMaskRCNNDataset(
@@ -247,7 +145,7 @@ def main(_run, datadir, batch_size, n_epochs, patience, learning_rate,
         batch_size=batch_size,
         shuffle=False,
         worker_init_fn=set_seeds,
-        collate_fn=collate_fn
+        collate_fn=dataset.collate_fn
     )
 
     info = {}
@@ -310,7 +208,7 @@ def main(_run, datadir, batch_size, n_epochs, patience, learning_rate,
         batch_size=batch_size,
         shuffle=False,
         worker_init_fn=set_seeds,
-        collate_fn=collate_fn
+        collate_fn=dataset.collate_fn
     )
 
     best_model = maskrcnn_resnet50_fpn(pretrained=True)
@@ -322,7 +220,7 @@ def main(_run, datadir, batch_size, n_epochs, patience, learning_rate,
     if not os.path.exists(outputs_dir):
         os.mkdir(outputs_dir)
 
-    run_inference(
+    test_outputs = run_inference(
         epoch=0,
         model=best_model,
         dataloader=test_dataloader,
@@ -330,3 +228,15 @@ def main(_run, datadir, batch_size, n_epochs, patience, learning_rate,
         class_map={i: c for c, i in test_dataset.classes_dict.items()},
         outputs_dir=outputs_dir
     )
+
+    test_results = run_evaluation(
+        outputs=test_outputs,
+        crop_factor=crop_factor,
+        classes=test_dataset.classes,
+        save_to=outputs_dir,
+        load_fn=lambda fp: test_dataset.resize(test_dataset.read_dcm(fp))
+    )
+
+    test_results_filepath = os.path.join(fs_observer.dir, "test_results.json")
+    with open(test_results_filepath, "w") as f:
+        json.dump(test_results, f)

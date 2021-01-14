@@ -1,11 +1,15 @@
+import pdb
+
 import collections
 import cv2
+import funcy
 import heapq
 import math
 import numpy as np
 import statistics
 
-threshDistFactor = 2  # Multiplicator of a median distance, to remove the outliers
+from scipy.ndimage.morphology import distance_transform_edt
+from skimage.segmentation import active_contour
 
 
 class Point:
@@ -43,11 +47,11 @@ def calc_min_dist(pt, contour) :
     return np.sqrt(l2)
 
 
-def draw_contour(image, contour) :
+def draw_contour(image, contour, color=(0, 0, 0)) :
     for i in range(1, len(contour)) :
         pt1 = (int(contour[i - 1][0]), int(contour[i - 1][1]))
         pt2 = (int(contour[i][0]), int(contour[i][1]))
-        image = cv2.line(image, pt1, pt2, (0, 0, 0), 1)
+        image = cv2.line(image, pt1, pt2, color, 1)
     return image
 
 
@@ -143,7 +147,7 @@ def construct_graph(contour, mask, r, alpha, beta, gamma, prev_contour=[]) :
     return edges
 
 
-def find_contour_points(img) :
+def find_contour_points(img, threshDistFactor=2) :
     locations = cv2.findNonZero(img)
     if locations is None :
         return [], []
@@ -217,3 +221,68 @@ def find_ends(img, r) :
         return [],[],[]
     [source, sink, r] = detect_tails(c, contour)
     return [name_to_pt(source), name_to_pt(sink)]
+
+
+def connect_with_active_contours(mask_, bbox_, alpha, beta, gamma):
+    mask = mask_.copy()
+    bbox = bbox_.copy()
+
+    x0, y0, x1, y1 = bbox
+    x_c = (x0 + ((x1 - x0) / 2.)).item()
+    y_c = (y0 + ((y1 - y0) / 2.)).item()
+
+    radius = (max(x1 - x0, y1 - y0) / 2.).item()
+
+    s = np.linspace(0, 2 * np.pi, 400)
+    r = y_c + radius * np.sin(s)
+    c = x_c + radius * np.cos(s)
+    init = np.array([r, c]).T
+
+    snake = active_contour(
+        mask,
+        init,
+        alpha=alpha,
+        beta=beta,
+        gamma=gamma
+    )
+
+    contour = np.zeros_like(snake)
+    contour[:, 0] = snake[:, 1]
+    contour[:, 1] = snake[:, 0]
+
+    return contour
+
+
+def MSD_fast(target, pred, crop_factor) :
+    MSD = 0
+    n_el = 0
+
+    dist_transform = distance_transform_edt(pred)
+    for i in range(target.shape[0]) :
+        for j in range(target.shape[1]) :
+            if target[i][j] == 0 :
+                MSD += dist_transform[i][j]
+                n_el += 1
+
+    dist_transform = distance_transform_edt(target)
+    for i in range(pred.shape[0]) :
+        for j in range(pred.shape[1]) :
+            if pred[i][j] == 0 :
+                MSD += dist_transform[i][j]
+                n_el += 1
+
+    return MSD / n_el * crop_factor * 1.62  # because of the cropping
+
+
+def evaluate_model(targets, contours, crop_factor):
+    targets = 255 * np.squeeze(targets)
+
+    MSD_values  = [
+        MSD_fast(target, contour, crop_factor) for target, contour in zip(targets, contours)
+    ]
+
+    compute_vals = funcy.lfilter(lambda v: v != -1, MSD_values)
+    MSD_mean = np.mean(compute_vals)
+    MSD_sigma = np.mean(compute_vals)
+
+    return MSD_mean, MSD_sigma
