@@ -84,7 +84,7 @@ def run_epoch(phase, epoch, model, dataloader, optimizer, writer=None, device=No
 
 @ex.automain
 def main(_run, datadir, batch_size, n_epochs, patience, learning_rate,
-         train_sequences, valid_sequences, test_sequences, classes, size,
+         train_sequences, valid_sequences, test_sequences, classes, size, mode,
          state_dict_fpath=None):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     num_classes = len(classes)
@@ -124,28 +124,30 @@ def main(_run, datadir, batch_size, n_epochs, patience, learning_rate,
         train_sequences,
         classes,
         size=size,
-        augmentations=augmentations
+        augmentations=augmentations,
+        mode=mode
     )
     train_dataloader = DataLoader(
         train_dataset,
         batch_size=batch_size,
         shuffle=True,
         worker_init_fn=set_seeds,
-        collate_fn=dataset.collate_fn
+        collate_fn=train_dataset.collate_fn
     )
 
     valid_dataset = VocalTractMaskRCNNDataset(
         datadir,
         valid_sequences,
         classes,
-        size=size
+        size=size,
+        mode=mode
     )
     valid_dataloader = DataLoader(
         valid_dataset,
         batch_size=batch_size,
         shuffle=False,
         worker_init_fn=set_seeds,
-        collate_fn=dataset.collate_fn
+        collate_fn=valid_dataset.collate_fn
     )
 
     info = {}
@@ -201,14 +203,15 @@ def main(_run, datadir, batch_size, n_epochs, patience, learning_rate,
         datadir,
         test_sequences,
         classes,
-        size=size
+        size=size,
+        mode=mode
     )
     test_dataloader = DataLoader(
         test_dataset,
         batch_size=batch_size,
         shuffle=False,
         worker_init_fn=set_seeds,
-        collate_fn=dataset.collate_fn
+        collate_fn=test_dataset.collate_fn
     )
 
     best_model = maskrcnn_resnet50_fpn(pretrained=True)

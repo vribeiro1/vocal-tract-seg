@@ -29,7 +29,8 @@ def main(cfg):
         cfg["datadir"],
         cfg["sequences"],
         cfg["classes"],
-        size=cfg["size"]
+        size=cfg["size"],
+        mode=cfg["mode"]
     )
 
     dataloader = DataLoader(
