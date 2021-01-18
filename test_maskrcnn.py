@@ -17,7 +17,7 @@ from connect_points import (connect_with_active_contours,
                             draw_contour,
                             evaluate_model)
 from dataset import VocalTractMaskRCNNDataset
-from evaluation import run_evaluation, run_inference
+from evaluation import run_evaluation, run_test
 from helpers import set_seeds
 from settings import *
 
@@ -52,7 +52,7 @@ def main(cfg):
         os.mkdir(cfg["save_to"])
 
     class_map = {i: c for c, i in dataset.classes_dict.items()}
-    outputs = run_inference(
+    outputs = run_test(
         epoch=0,
         model=model,
         dataloader=dataloader,

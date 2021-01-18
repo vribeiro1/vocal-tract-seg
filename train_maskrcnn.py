@@ -23,7 +23,7 @@ from augmentations import (MultiCompose,
                            MultiRandomVerticalFlip)
 from copy import deepcopy
 from dataset import VocalTractMaskRCNNDataset
-from evaluation import run_evaluation, run_inference
+from evaluation import run_evaluation, run_test
 from helpers import set_seeds
 from settings import *
 
@@ -183,7 +183,7 @@ def main(_run, datadir, batch_size, n_epochs, patience, learning_rate,
             torch.save(model.state_dict(), best_model_path)
             epochs_since_best = 0
 
-            run_inference(
+            run_test(
                 epoch=epoch,
                 model=model,
                 dataloader=valid_dataloader,
@@ -223,7 +223,7 @@ def main(_run, datadir, batch_size, n_epochs, patience, learning_rate,
     if not os.path.exists(outputs_dir):
         os.mkdir(outputs_dir)
 
-    test_outputs = run_inference(
+    test_outputs = run_test(
         epoch=0,
         model=best_model,
         dataloader=test_dataloader,
