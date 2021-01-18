@@ -1,0 +1,31 @@
+datadir: /path/to/data
+mode: rgb  # Options are rgb or gray
+batch_size: 2
+n_epochs: 500
+patience: 50
+learning_rate: 0.0001
+size: [136, 136]
+train_sequences:
+    "1612": []
+    "1617": []
+    "1618": []
+    "1628": []
+    "1638": []
+    "1635": []
+    "1662": []
+valid_sequences:
+    "1640": []
+test_sequences:
+    "1653": []
+    "1659": []
+
+classes:
+    # - arytenoid-muscle
+    # - epiglottis
+    # - hyoid-bone
+    - lower-lip
+    - soft-palate
+    # - thyroid-cartilage
+    - tongue
+    - upper-lip
+    # - vocal-folds

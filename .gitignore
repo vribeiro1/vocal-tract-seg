@@ -9,7 +9,7 @@
 __pycache__
 
 config/*
-!config/config.yaml.example
+!config/*.yaml.example
 
 results
 runs
