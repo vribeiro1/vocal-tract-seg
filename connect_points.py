@@ -283,6 +283,6 @@ def evaluate_model(targets, contours, crop_factor):
 
     compute_vals = funcy.lfilter(lambda v: v != -1, MSD_values)
     MSD_mean = np.mean(compute_vals)
-    MSD_sigma = np.mean(compute_vals)
+    MSD_sigma = np.std(compute_vals)
 
     return MSD_mean, MSD_sigma
