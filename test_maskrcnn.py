@@ -2,6 +2,7 @@ import pdb
 
 import argparse
 import funcy
+import json
 import numpy as np
 import os
 import torch
@@ -68,6 +69,10 @@ def main(cfg):
         lambda fp: dataset.resize(dataset.read_dcm(fp))
     )
 
+    results_filepath = os.path.join(cfg["save_to"], "test_results.json")
+    with open(results_filepath, "w") as f:
+        json.dump(results, f)
+
     llip_mean, llip_std = results[LOWER_LIP]
     soft_palate_mean, soft_palate_std = results[SOFT_PALATE]
     tongue_mean, tongue_std = results[TONGUE]
@@ -81,6 +86,8 @@ Soft palate: MSD = {soft_palate_mean} +- {soft_palate_std}
 Tongue: MSD = {tongue_mean} +- {tongue_std}
 Upper lip: MSD = {ulip_mean} +- {ulip_std}
 """)
+
+
 
 
 if __name__ == "__main__":
