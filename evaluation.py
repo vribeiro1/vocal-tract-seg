@@ -95,7 +95,7 @@ def run_inference(epoch, model, dataloader, outputs_dir, class_map, threshold=No
                     pred_cls = class_map[label.item()]
                     mask_filepath = os.path.join(
                         mask_dirname,
-                        f"{im_info['instance_number']}_{pred_cls}.png"
+                        f"{'%04d' % im_info['instance_number']}_{pred_cls}.png"
                     )
                     mask_img.save(mask_filepath)
 
@@ -147,16 +147,23 @@ def run_evaluation(outputs, crop_factor, classes, save_to=None, load_fn=None):
         gamma = post_processing["gamma"]
         threshold = post_processing["threshold"]
 
-        mask_thr = mask.copy()
-        mask_thr[mask_thr <= threshold] = 0
-        mask_thr[mask_thr > threshold] = 1
+        contour = []
+        threshold_tmp = threshold
+        while len(contour) < 10:
+            mask_thr = mask.copy()
+            mask_thr[mask_thr <= threshold_tmp] = 0
+            mask_thr[mask_thr > threshold_tmp] = 1
 
-        if post_processing_method == GRAPH_BASED:
-            contour, _, _ = connect_points_graph_based(mask_thr, 3, alpha, beta, gamma, [])
-        elif post_processing_method == ACTIVE_CONTOURS:
-            contour = connect_with_active_contours(mask, box, alpha, beta, gamma)
-        else:
-            raise ValueError(f"Unavailable post-processing method '{post_processing}'")
+            if post_processing_method == GRAPH_BASED:
+                contour, _, _ = connect_points_graph_based(mask_thr, 3, alpha, beta, gamma, [])
+            elif post_processing_method == ACTIVE_CONTOURS:
+                contour = connect_with_active_contours(mask, box, alpha, beta, gamma)
+            else:
+                raise ValueError(f"Unavailable post-processing method '{post_processing}'")
+
+            threshold_tmp = threshold_tmp - 0.05
+            if threshold_tmp < 0.0:
+                break
 
         zeros = np.zeros_like(mask_thr)
         clean_contour = draw_contour(zeros, contour, color=(255, 255, 255))
@@ -172,7 +179,7 @@ def run_evaluation(outputs, crop_factor, classes, save_to=None, load_fn=None):
                 os.makedirs(outputs_dir)
 
             img = load_fn(out["dcm_filepath"])
-            filepath = os.path.join(outputs_dir, f"{out['instance_number']}_{pred_class}.png")
+            filepath = os.path.join(outputs_dir, f"{'%04d' % out['instance_number']}_{pred_class}.png")
             save_image_with_contour(img, filepath, contour, target)
 
         targets.append(target)
