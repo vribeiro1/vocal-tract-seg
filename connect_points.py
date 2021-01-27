@@ -1,14 +1,15 @@
 import pdb
 
-import collections
 import cv2
-import funcy
 import heapq
 import math
 import numpy as np
 import statistics
 
-from scipy.ndimage.morphology import distance_transform_edt
+from collections import defaultdict
+from copy import deepcopy
+from scipy.spatial.distance import euclidean
+from skimage.morphology import skeletonize
 from skimage.segmentation import active_contour
 
 
@@ -19,43 +20,43 @@ class Point:
 
     # 4-th power of distance, because linear distance will force the algorithm
     # to connect points which are far from each other, skiping another points
-    def weightTo(self, other) :
+    def weightTo(self, other):
         return ((self.x - other.x)**2 + (self.y - other.y)**2)**2
 
-    def distanceTo(self, other) :
+    def distanceTo(self, other):
         return math.sqrt((self.x - other.x)**2 + (self.y - other.y)**2)
 
-    def __lt__(self, other) :
+    def __lt__(self, other):
         return True
 
 
-def name_to_pt(name) :
+def name_to_pt(name):
     coordList = name.split()
     return (int(coordList[0]), int(coordList[1]))
 
 
-def pt_to_name(pt) :
+def pt_to_name(pt):
     return (str(pt[0]) + " " + str(pt[1]))
 
 
-def calc_min_dist(pt, contour) :
+def calc_min_dist(pt, contour):
     l2 = 10000000
-    for pt_cont in contour :
+    for pt_cont in contour:
         l2_new = (pt.x - pt_cont[0])**2 + (pt.y - pt_cont[1])**2
-        if l2_new < l2 :
+        if l2_new < l2:
             l2 = l2_new
     return np.sqrt(l2)
 
 
-def draw_contour(image, contour, color=(0, 0, 0)) :
-    for i in range(1, len(contour)) :
+def draw_contour(image, contour, color=(0, 0, 0)):
+    for i in range(1, len(contour)):
         pt1 = (int(contour[i - 1][0]), int(contour[i - 1][1]))
         pt2 = (int(contour[i][0]), int(contour[i][1]))
         image = cv2.line(image, pt1, pt2, color, 1)
     return image
 
 
-def uint16_to_uint8(image) :
+def uint16_to_uint8(image):
     max_val = np.amax(image)
     image = image.astype(float) * 255. / max_val
     image = image.astype(np.uint8)
@@ -68,9 +69,8 @@ def shortest_path(edges, source, sink):
     """
     This function is from https://gist.github.com/hanfang/89d38425699484cd3da80ca086d78129
     """
-
     # create a weighted DAG - {node:[(cost,neighbour), ...]}
-    graph = collections.defaultdict(list)
+    graph = defaultdict(list)
     for l, r, c in edges:
         graph[l].append((c,r))
     # create a priority queue and hash set to store visited nodes
@@ -96,50 +96,53 @@ def shortest_path(edges, source, sink):
 # We take all the contour points around the center of mass, then we sort them and
 # detect a maximal gap. We think that the points separated by this gap are the tails,
 # but it can be not the case in many cases. Pay attention.
-def detect_tails(point, otherPoints) :
+def detect_tails(point, otherPoints):
     anglesAndPoints = []
-    for otherPoint in otherPoints :
+    for otherPoint in otherPoints:
         angle = math.atan2(otherPoint.y - point.y, otherPoint.x - point.x)
         anglesAndPoints.append([angle, otherPoint])
 
     anglesAndPoints.sort()
     maxGap = 0
-    for i in range(1, len(anglesAndPoints)) :
+    for i in range(1, len(anglesAndPoints)):
         angleDistance = anglesAndPoints[i][0] - anglesAndPoints[i - 1][0]
-        if angleDistance > maxGap :
+        if angleDistance > maxGap:
             maxGap = angleDistance
             pt1 = anglesAndPoints[i - 1][1]
             pt2 = anglesAndPoints[i][1]
 
-    if len(anglesAndPoints) < 2 :
+    if len(anglesAndPoints) < 2:
       return otherPoints
 
-    if maxGap == 0 :
+    if maxGap == 0:
        return [anglesAndPoints[0][1], anglesAndPoints[1][1]]
 
-    if (2 * math.pi - anglesAndPoints[-1][0] + anglesAndPoints[0][0]) > maxGap :
+    if (2 * math.pi - anglesAndPoints[-1][0] + anglesAndPoints[0][0]) > maxGap:
        maxGap = 2 * math.pi - anglesAndPoints[-1][0] + anglesAndPoints[0][0]
        pt1 = anglesAndPoints[-1][1]
        pt2 = anglesAndPoints[0][1]
 
     dist = int(pt1.distanceTo(pt2))
 
-    return pt_to_name((pt1.x, pt1.y)), pt_to_name((pt2.x, pt2.y)), dist
+    return (pt1.x, pt1.y), (pt2.x, pt2.y), dist
 
 
-def construct_graph(contour, mask, r, alpha, beta, gamma, prev_contour=[]) :
+def construct_graph(contour, mask, r, alpha, beta, gamma, prev_contour=None):
+    if prev_contour is None:
+        prev_contour = []
+
     edges = []
-    for pt in contour :
+    for pt in contour:
         otherPoints = []
-        for ix in range(pt.x - r, pt.x + r) :
-            for iy in range(pt.y - r, pt.y + r) :
-                if (ix < 0 or iy < 0 or ix > mask.shape[1] - 1 or iy > mask.shape[0] - 1 or (ix == pt.x and iy == pt.y)) :
+        for ix in range(pt.x - r, pt.x + r):
+            for iy in range(pt.y - r, pt.y + r):
+                if (ix < 0 or iy < 0 or ix > mask.shape[1] - 1 or iy > mask.shape[0] - 1 or (ix == pt.x and iy == pt.y)):
                     continue
-                if mask[iy][ix] :
+                if mask[iy][ix]:
                     P = mask[iy][ix]
-                    if prev_contour == [] :
+                    if prev_contour == []:
                         R = 0
-                    else :
+                    else:
                         R = calc_min_dist(Point(ix, iy), prev_contour)
                     otherPoints.append(Point(ix, iy))
                     weight = alpha * pt.weightTo(Point(ix, iy)) + beta * (1 - P) + gamma * R
@@ -147,18 +150,19 @@ def construct_graph(contour, mask, r, alpha, beta, gamma, prev_contour=[]) :
     return edges
 
 
-def find_contour_points(img, threshDistFactor=2) :
+def find_contour_points(img, threshDistFactor=2):
     locations = cv2.findNonZero(img)
-    if locations is None :
+    if locations is None:
         return [], []
+
     # Construct a list with all points
     points = []
-    for i in range(0, locations.shape[0]) :
+    for i in range(0, locations.shape[0]):
         points.append(Point(locations[i][0][0], locations[i][0][1]))
     # Center of the mass
     cx = 0
     cy = 0
-    for pt in points :
+    for pt in points:
         cx += pt.x
         cy += pt.y
     cx /= len(points)
@@ -167,21 +171,21 @@ def find_contour_points(img, threshDistFactor=2) :
 
     # Calculate all distances to the center of the mass and their median
     dist = []
-    for pt in points :
+    for pt in points:
         dist.append(pt.distanceTo(c))
     medDist = statistics.median(dist)
 
     # If the point is not farther than the threshold, count that this is not
     # an outlier
     contour = []
-    for pt in points :
-        if pt.distanceTo(c) < threshDistFactor * medDist :
+    for pt in points:
+        if pt.distanceTo(c) < threshDistFactor * medDist:
             contour.append(pt)
 
     # Center of the mass
     cx = 0
     cy = 0
-    for pt in contour :
+    for pt in contour:
         cx += pt.x
         cy += pt.y
     cx /= len(points)
@@ -191,8 +195,25 @@ def find_contour_points(img, threshDistFactor=2) :
     return contour, c
 
 
-def connect_points_graph_based(img, r, alpha, beta, gamma, prev_contour=[]) :
-    contour, c = find_contour_points(img)
+def rescale_contour(contour, s_in, s_out):
+    r = s_out / s_in
+    return contour * r
+
+
+def connect_points_graph_based(mask, r, alpha, beta, gamma, upscale=None, prev_contour=None):
+    s_out, _ = mask.shape
+    if upscale is not None:
+        s_in = upscale
+        mask = cv2.resize(mask, (upscale, upscale), interpolation=cv2.INTER_CUBIC)
+    else:
+        s_in = s_out
+
+    mask = skeletonize(mask).astype(np.uint8)
+
+    if prev_contour is None:
+        prev_contour = []
+
+    contour, c = find_contour_points(mask)
     if len(contour) == 0:
         return [], [], []
 
@@ -200,8 +221,8 @@ def connect_points_graph_based(img, r, alpha, beta, gamma, prev_contour=[]) :
     # Distance betweent the tails is decreased by 1, to not connect the
     # tails, but connect for sure all another points
 
-    edges = construct_graph(contour, img, r - 1, alpha, beta, gamma, prev_contour=prev_contour)
-    names = shortest_path(edges, source, sink)
+    edges = construct_graph(contour, mask, r - 1, alpha, beta, gamma, prev_contour=prev_contour)
+    names = shortest_path(edges, pt_to_name(source), pt_to_name(sink))
     if type(names) is float:
         return [], [], []
 
@@ -211,16 +232,20 @@ def connect_points_graph_based(img, r, alpha, beta, gamma, prev_contour=[]) :
         pt = name_to_pt(name)
         path.append(pt)
 
-    return path, name_to_pt(source), name_to_pt(sink)
+    path = rescale_contour(np.array(path), s_in, s_out)
+
+    return path, source, sink
 
 
-def find_ends(img, r) :
+def find_ends(img, r):
     img = 255 * img
+
     [contour, c] = find_contour_points(img)
-    if len(contour) == 0 :
+    if len(contour) == 0:
         return [],[],[]
-    [source, sink, r] = detect_tails(c, contour)
-    return [name_to_pt(source), name_to_pt(sink)]
+
+    source, sink, r = detect_tails(c, contour)
+    return [source, sink]
 
 
 def connect_with_active_contours(mask_, bbox_, alpha, beta, gamma):
@@ -253,36 +278,35 @@ def connect_with_active_contours(mask_, bbox_, alpha, beta, gamma):
     return contour
 
 
-def MSD_fast(target, pred, crop_factor) :
-    MSD = 0
-    n_el = 0
-
-    dist_transform = distance_transform_edt(pred)
-    for i in range(target.shape[0]) :
-        for j in range(target.shape[1]) :
-            if target[i][j] == 0 :
-                MSD += dist_transform[i][j]
-                n_el += 1
-
-    dist_transform = distance_transform_edt(target)
-    for i in range(pred.shape[0]) :
-        for j in range(pred.shape[1]) :
-            if pred[i][j] == 0 :
-                MSD += dist_transform[i][j]
-                n_el += 1
-
-    return MSD / n_el * crop_factor * 1.62  # because of the cropping
+def _remove_duplicates(iterable):
+        seen = set()
+        return [item for item in iterable if not (item in seen or seen.add(item))]
 
 
-def evaluate_model(targets, contours, crop_factor):
-    targets = 255 * np.squeeze(targets)
+def _skeleton_sort(points_, origin, max_dist=5):
+    points = _remove_duplicates(deepcopy(points_))
+    curr_p = origin
 
-    MSD_values  = [
-        MSD_fast(target, contour, crop_factor) for target, contour in zip(targets, contours)
-    ]
+    sorted_points = []
+    while len(points) > 0:
+        next_p = min(points, key=lambda p: euclidean(p, curr_p))
 
-    compute_vals = funcy.lfilter(lambda v: v != -1, MSD_values)
-    MSD_mean = np.mean(compute_vals)
-    MSD_sigma = np.std(compute_vals)
+        dist = euclidean(next_p, curr_p)
+        if dist < max_dist or curr_p == origin:
+            sorted_points.append(next_p)
+            curr_p = next_p
 
-    return MSD_mean, MSD_sigma
+        points.remove(next_p)
+
+    return sorted_points
+
+
+def connect_with_skeleton(mask):
+    im_H, im_W = mask.shape
+
+    skeleton = skeletonize(mask)
+    y, x = np.where(skeleton == True)
+    unsorted_points = list(zip(x, y))
+    sorted_points = _skeleton_sort(unsorted_points, (0, im_W))
+
+    return sorted_points

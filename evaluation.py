@@ -11,9 +11,10 @@ from tqdm import tqdm
 
 from connect_points import (connect_with_active_contours,
                             connect_points_graph_based,
-                            draw_contour,
-                            evaluate_model)
+                            connect_with_skeleton,
+                            draw_contour)
 from dataset import VocalTractMaskRCNNDataset
+from metrics import evaluate_model
 from settings import *
 
 
@@ -40,19 +41,22 @@ def calculate_contour(pred_class, mask, box):
     alpha = post_processing["alpha"]
     beta = post_processing["beta"]
     gamma = post_processing["gamma"]
+    upscale = post_processing["upscale"]
     threshold = post_processing["threshold"]
 
     contour = []
     threshold_tmp = threshold
     while len(contour) < 10:
         mask_thr = mask.copy()
-        mask_thr[mask_thr <= threshold_tmp] = 0
-        mask_thr[mask_thr > threshold_tmp] = 1
+        mask_thr[mask_thr <= threshold_tmp] = 0.
+        mask_thr[mask_thr > threshold_tmp] = 1.
 
         if post_processing_method == GRAPH_BASED:
-            contour, _, _ = connect_points_graph_based(mask_thr, 3, alpha, beta, gamma, [])
+            contour, _, _ = connect_points_graph_based(mask_thr, 3, alpha, beta, gamma, upscale)
         elif post_processing_method == ACTIVE_CONTOURS:
             contour = connect_with_active_contours(mask, box, alpha, beta, gamma)
+        elif post_processing_method == SKELETON:
+            contour = connect_with_skeleton(mask_thr)
         else:
             raise ValueError(f"Unavailable post-processing method '{post_processing}'")
 
@@ -136,7 +140,7 @@ def run_test(epoch, model, dataloader, outputs_dir, class_map, threshold=None, d
                     mask_arr = mask_arr.astype(np.uint8)
 
                     mask_img = Image.fromarray(mask_arr)
-                    mask_img = draw_bbox(mask_img, box, "%.4f" % score)
+                    # mask_img = draw_bbox(mask_img, box, "%.4f" % score)
 
                     mask_dirname = os.path.join(
                         epoch_outputs_dir,
@@ -167,7 +171,7 @@ def run_test(epoch, model, dataloader, outputs_dir, class_map, threshold=None, d
     return return_outputs
 
 
-def run_evaluation(outputs, crop_factor, classes, save_to=None, load_fn=None):
+def run_evaluation(outputs, classes, save_to=None, load_fn=None):
     pred_classes = []
     targets = []
     contours = []
@@ -206,7 +210,7 @@ def run_evaluation(outputs, crop_factor, classes, save_to=None, load_fn=None):
 
         cls_targets = [t[1] for t in filtered]
         cls_contours = [t[2] for t in filtered]
-        cls_mean, cls_std = evaluate_model(cls_targets, cls_contours, crop_factor)
+        cls_mean, cls_std = evaluate_model(cls_targets, cls_contours)
 
         results[cls_] = (cls_mean, cls_std)
 

@@ -15,6 +15,7 @@ UPPER_LIP = "upper-lip"
 
 GRAPH_BASED = "graph-based"
 ACTIVE_CONTOURS = "active-contours"
+SKELETON = "skeletonize"
 
 # Post-processing configuration per class
 POST_PROCESSING = {
@@ -23,27 +24,31 @@ POST_PROCESSING = {
         alpha=1,
         beta=10,
         gamma=0,
-        threshold = 0.3
+        upscale=512,
+        threshold=0.4
     ),
     SOFT_PALATE: dict(
-        method=ACTIVE_CONTOURS,
-        alpha = 0.00015,
+        method=SKELETON,
+        alpha=0.00015,
         beta=1000,
         gamma=0.1,
-        threshold=0.4
+        upscale=512,
+        threshold=0.5
     ),
     TONGUE: dict(
         method=GRAPH_BASED,
         alpha=1,
         beta=10,
         gamma=0,
-        threshold = 0.2
+        upscale=512,
+        threshold=0.2
     ),
     UPPER_LIP: dict(
         method=GRAPH_BASED,
         alpha=1,
         beta=10,
         gamma=0,
-        threshold = 0.3
+        upscale=512,
+        threshold=0.4
     )
 }
