@@ -15,15 +15,11 @@ from torch.utils.data import DataLoader
 from torchvision.models.detection.mask_rcnn import maskrcnn_resnet50_fpn
 from tqdm import tqdm
 
-from connect_points import (connect_with_active_contours,
-                            connect_points_graph_based,
-                            draw_contour,
-                            evaluate_model)
+from connect_points import draw_contour
 from dataset import VocalTractMaskRCNNDataset
 from evaluation import calculate_contour, draw_bbox
 from helpers import set_seeds
 from settings import *
-
 
 COLORS = {
     "lower-lip": (255, 0, 0),

@@ -1,21 +1,14 @@
 import pdb
 
 import argparse
-import funcy
 import json
-import numpy as np
 import os
 import torch
 import yaml
 
-from PIL import Image
 from torch.utils.data import DataLoader
 from torchvision.models.detection.mask_rcnn import maskrcnn_resnet50_fpn
 
-from connect_points import (connect_with_active_contours,
-                            connect_points_graph_based,
-                            draw_contour,
-                            evaluate_model)
 from dataset import VocalTractMaskRCNNDataset
 from evaluation import run_evaluation, run_test
 from helpers import set_seeds
@@ -58,14 +51,13 @@ def main(cfg):
         dataloader=dataloader,
         device=device,
         class_map=class_map,
-        outputs_dir=cfg["save_to"]
+        outputs_dir=os.path.join(cfg["save_to"], "test_outputs")
     )
 
     results = run_evaluation(
         outputs,
-        0.7,
         dataset.classes,
-        cfg["save_to"],
+        os.path.join(cfg["save_to"], "test_outputs"),
         lambda fp: dataset.resize(dataset.read_dcm(fp))
     )
 
@@ -86,8 +78,6 @@ Soft palate: MSD = {soft_palate_mean} +- {soft_palate_std}
 Tongue: MSD = {tongue_mean} +- {tongue_std}
 Upper lip: MSD = {ulip_mean} +- {ulip_std}
 """)
-
-
 
 
 if __name__ == "__main__":

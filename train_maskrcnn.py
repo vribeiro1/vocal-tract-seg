@@ -234,7 +234,6 @@ def main(_run, datadir, batch_size, n_epochs, patience, learning_rate,
 
     test_results = run_evaluation(
         outputs=test_outputs,
-        crop_factor=0.7,
         classes=test_dataset.classes,
         save_to=outputs_dir,
         load_fn=lambda fp: test_dataset.resize(test_dataset.read_dcm(fp))
