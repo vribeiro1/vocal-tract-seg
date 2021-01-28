@@ -7,10 +7,7 @@ import numpy as np
 import statistics
 
 from collections import defaultdict
-from copy import deepcopy
-from scipy.spatial.distance import euclidean
 from skimage.morphology import skeletonize
-from skimage.segmentation import active_contour
 
 
 class Point:
@@ -46,14 +43,6 @@ def calc_min_dist(pt, contour):
         if l2_new < l2:
             l2 = l2_new
     return np.sqrt(l2)
-
-
-def draw_contour(image, contour, color=(0, 0, 0)):
-    for i in range(1, len(contour)):
-        pt1 = (int(contour[i - 1][0]), int(contour[i - 1][1]))
-        pt2 = (int(contour[i][0]), int(contour[i][1]))
-        image = cv2.line(image, pt1, pt2, color, 1)
-    return image
 
 
 def uint16_to_uint8(image):
@@ -195,19 +184,18 @@ def find_contour_points(img, threshDistFactor=2):
     return contour, c
 
 
-def rescale_contour(contour, s_in, s_out):
-    r = s_out / s_in
-    return contour * r
+def find_ends(img, r):
+    img = 255 * img
+
+    [contour, c] = find_contour_points(img)
+    if len(contour) == 0:
+        return [],[],[]
+
+    source, sink, r = detect_tails(c, contour)
+    return [source, sink]
 
 
-def connect_points_graph_based(mask, r, alpha, beta, gamma, upscale=None, prev_contour=None):
-    s_out, _ = mask.shape
-    if upscale is not None:
-        s_in = upscale
-        mask = cv2.resize(mask, (upscale, upscale), interpolation=cv2.INTER_CUBIC)
-    else:
-        s_in = s_out
-
+def connect_points_graph_based(mask, r, alpha, beta, gamma, prev_contour=None):
     mask = skeletonize(mask).astype(np.uint8)
 
     if prev_contour is None:
@@ -232,81 +220,4 @@ def connect_points_graph_based(mask, r, alpha, beta, gamma, upscale=None, prev_c
         pt = name_to_pt(name)
         path.append(pt)
 
-    path = rescale_contour(np.array(path), s_in, s_out)
-
-    return path, source, sink
-
-
-def find_ends(img, r):
-    img = 255 * img
-
-    [contour, c] = find_contour_points(img)
-    if len(contour) == 0:
-        return [],[],[]
-
-    source, sink, r = detect_tails(c, contour)
-    return [source, sink]
-
-
-def connect_with_active_contours(mask_, bbox_, alpha, beta, gamma):
-    mask = mask_.copy()
-    bbox = bbox_.copy()
-
-    x0, y0, x1, y1 = bbox
-    x_c = (x0 + ((x1 - x0) / 2.)).item()
-    y_c = (y0 + ((y1 - y0) / 2.)).item()
-
-    radius = (max(x1 - x0, y1 - y0) / 2.).item()
-
-    s = np.linspace(0, 2 * np.pi, 400)
-    r = y_c + radius * np.sin(s)
-    c = x_c + radius * np.cos(s)
-    init = np.array([r, c]).T
-
-    snake = active_contour(
-        mask,
-        init,
-        alpha=alpha,
-        beta=beta,
-        gamma=gamma
-    )
-
-    contour = np.zeros_like(snake)
-    contour[:, 0] = snake[:, 1]
-    contour[:, 1] = snake[:, 0]
-
-    return contour
-
-
-def _remove_duplicates(iterable):
-        seen = set()
-        return [item for item in iterable if not (item in seen or seen.add(item))]
-
-
-def _skeleton_sort(points_, origin, max_dist=5):
-    points = _remove_duplicates(deepcopy(points_))
-    curr_p = origin
-
-    sorted_points = []
-    while len(points) > 0:
-        next_p = min(points, key=lambda p: euclidean(p, curr_p))
-
-        dist = euclidean(next_p, curr_p)
-        if dist < max_dist or curr_p == origin:
-            sorted_points.append(next_p)
-            curr_p = next_p
-
-        points.remove(next_p)
-
-    return sorted_points
-
-
-def connect_with_skeleton(mask):
-    im_H, im_W = mask.shape
-
-    skeleton = skeletonize(mask)
-    y, x = np.where(skeleton == True)
-    unsorted_points = list(zip(x, y))
-    sorted_points = _skeleton_sort(unsorted_points, (0, im_W))
-
-    return sorted_points
+    return np.array(path), source, sink
