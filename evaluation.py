@@ -1,5 +1,6 @@
 import pdb
 
+import cv2
 import funcy
 import numpy as np
 import os
@@ -12,7 +13,7 @@ from tqdm import tqdm
 from connect_points import (connect_with_active_contours,
                             connect_points_graph_based,
                             connect_with_skeleton,
-                            draw_contour)
+                            draw_contour, rescale_contour)
 from dataset import VocalTractMaskRCNNDataset
 from metrics import evaluate_model
 from settings import *
@@ -46,15 +47,26 @@ def calculate_contour(pred_class, mask, box):
 
     contour = []
     threshold_tmp = threshold
+
+    # If we upscale before post-processing, we need to define a function to rescale the generated
+    # contour. Else, we use an identity function as a placeholder.
+    if upscale is not None:
+        s_out, _ = mask.shape
+        s_in = upscale
+        mask = cv2.resize(mask, (upscale, upscale), interpolation=cv2.INTER_CUBIC)
+        rescale_contour_fn = funcy.partial(rescale_contour, s_in=s_in, s_out=s_out)
+    else:
+        rescale_contour_fn = lambda x: x
+
     while len(contour) < 10:
         mask_thr = mask.copy()
         mask_thr[mask_thr <= threshold_tmp] = 0.
         mask_thr[mask_thr > threshold_tmp] = 1.
 
         if post_processing_method == GRAPH_BASED:
-            contour, _, _ = connect_points_graph_based(mask_thr, 3, alpha, beta, gamma, upscale)
+            contour, _, _ = connect_points_graph_based(mask_thr, 3, alpha, beta, gamma)
         elif post_processing_method == ACTIVE_CONTOURS:
-            contour = connect_with_active_contours(mask, box, alpha, beta, gamma)
+            contour = connect_with_active_contours(mask_thr, pred_class, alpha, beta, gamma)
         elif post_processing_method == SKELETON:
             contour = connect_with_skeleton(mask_thr)
         else:
@@ -64,6 +76,7 @@ def calculate_contour(pred_class, mask, box):
         if threshold_tmp < 0.0:
             break
 
+    contour = rescale_contour_fn(contour)
     return contour
 
 
@@ -196,8 +209,18 @@ def run_evaluation(outputs, classes, save_to=None, load_fn=None):
                 os.makedirs(outputs_dir)
 
             img = load_fn(out["dcm_filepath"])
-            filepath = os.path.join(outputs_dir, f"{'%04d' % out['instance_number']}_{pred_class}.png")
-            save_image_with_contour(img, filepath, contour, target)
+            img_filepath = os.path.join(
+                outputs_dir,
+                f"{'%04d' % out['instance_number']}_{pred_class}.png"
+            )
+            save_image_with_contour(img, img_filepath, contour, target)
+
+            npy_filepath = os.path.join(
+                outputs_dir,
+                f"{'%04d' % out['instance_number']}_{pred_class}.npy"
+            )
+            with open(npy_filepath, "wb") as f:
+                np.save(f, contour)
 
         targets.append(target)
         contours.append(clean_contour)

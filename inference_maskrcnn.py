@@ -250,8 +250,12 @@ def main(cfg):
                 img = dataset.resize(dataset.read_dcm(os.path.join(
                     cfg["datadir"], subject, sequence, "dicoms", f"{'%04d' % instance_number}.dcm"
                 )))
-                filepath = os.path.join(outputs_dir, f"{'%04d' % instance_number}.png")
-                save_image_with_contours(img, filepath, contours)
+                img_filepath = os.path.join(outputs_dir, f"{'%04d' % instance_number}.png")
+                save_image_with_contours(img, img_filepath, contours)
+
+                npy_filepath = os.path.join(outputs_dir, f"{'%04d' % out['instance_number']}_{pred_class}.npy")
+                with open(npy_filepath, "wb") as f:
+                    np.save(f, contour)
 
 
 if __name__ == "__main__":
