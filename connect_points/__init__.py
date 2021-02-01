@@ -1,6 +1,7 @@
 import cv2
 
 from .active_contours import *
+from .calculate_contours import *
 from .graph_based import *
 from .skeleton import *
 
@@ -11,8 +12,3 @@ def draw_contour(image, contour, color=(0, 0, 0)):
         pt2 = (int(contour[i][0]), int(contour[i][1]))
         image = cv2.line(image, pt1, pt2, color, 1)
     return image
-
-
-def rescale_contour(contour, s_in, s_out):
-    r = s_out / s_in
-    return contour * r

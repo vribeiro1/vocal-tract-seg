@@ -9,7 +9,7 @@ from .graph_based import find_contour_points, detect_tails
 
 
 def get_box_from_mask_tensor(mask_, margin=0):
-    mask = mask_.copy() * 255
+    mask = mask_.copy()
     mask_np = mask.astype(np.uint8)
 
     props = regionprops(mask_np)
@@ -91,10 +91,11 @@ def get_circle(p1, p2, p3):
     return (xc, yc), r
 
 
-def connect_with_active_contours(mask_, art, alpha, beta, gamma, n_samples=400, max_iter=2500):
-    mask_arr = mask_.copy()
+def connect_with_active_contours(mask_, mask_thr_, art, alpha, beta, gamma, n_samples=400, max_iter=2500):
+    mask = mask_.copy()
+    mask_thr = mask_thr_.copy()
 
-    ext1, ext2, ext3 = get_extremities(art, mask_arr)
+    ext1, ext2, ext3 = get_extremities(art, mask_thr)
     (x_c, y_c), radius = get_circle(ext1, ext2, ext3)
 
     x1, y1 = ext1
@@ -116,7 +117,7 @@ def connect_with_active_contours(mask_, art, alpha, beta, gamma, n_samples=400, 
     init = np.array([r, c]).T
 
     snake = active_contour(
-        mask_arr,
+        mask,
         init,
         alpha=alpha,
         beta=beta,
@@ -128,5 +129,8 @@ def connect_with_active_contours(mask_, art, alpha, beta, gamma, n_samples=400, 
     contour = np.zeros_like(snake)
     contour[:, 0] = snake[:, 1]
     contour[:, 1] = snake[:, 0]
+
+    if np.isnan(contour).any():
+        pdb.set_trace()
 
     return contour

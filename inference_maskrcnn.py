@@ -221,11 +221,10 @@ def main(cfg):
         sequence = out["sequence"]
         instance_number = out["instance_number"]
 
-        box = out["box"]
         mask = out["mask"]
         pred_class = out["pred_cls"]
 
-        contour = calculate_contour(pred_class, mask, box)
+        contour = calculate_contour(pred_class, mask)
 
         if subject not in contours_per_image:
             contours_per_image[subject] = {}

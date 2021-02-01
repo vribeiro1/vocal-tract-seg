@@ -10,10 +10,7 @@ from copy import deepcopy
 from PIL import Image, ImageDraw
 from tqdm import tqdm
 
-from connect_points import (connect_with_active_contours,
-                            connect_points_graph_based,
-                            connect_with_skeleton,
-                            draw_contour, rescale_contour)
+from connect_points import calculate_contour, draw_contour
 from dataset import VocalTractMaskRCNNDataset
 from metrics import evaluate_model
 from settings import *
@@ -29,55 +26,6 @@ def save_image_with_contour(img, filepath, contour, target=None):
 
     mask_contour_img = Image.fromarray(mask_contour)
     mask_contour_img.save(filepath)
-
-
-def calculate_contour(pred_class, mask, box):
-    if pred_class not in POST_PROCESSING:
-        raise KeyError(
-            f"Class '{pred_class}' does not have post-processing parameters configured"
-        )
-
-    post_processing = POST_PROCESSING[pred_class]
-    post_processing_method = post_processing["method"]
-    alpha = post_processing["alpha"]
-    beta = post_processing["beta"]
-    gamma = post_processing["gamma"]
-    upscale = post_processing["upscale"]
-    threshold = post_processing["threshold"]
-
-    contour = []
-    threshold_tmp = threshold
-
-    # If we upscale before post-processing, we need to define a function to rescale the generated
-    # contour. Else, we use an identity function as a placeholder.
-    if upscale is not None:
-        s_out, _ = mask.shape
-        s_in = upscale
-        mask = cv2.resize(mask, (upscale, upscale), interpolation=cv2.INTER_CUBIC)
-        rescale_contour_fn = funcy.partial(rescale_contour, s_in=s_in, s_out=s_out)
-    else:
-        rescale_contour_fn = lambda x: x
-
-    while len(contour) < 10:
-        mask_thr = mask.copy()
-        mask_thr[mask_thr <= threshold_tmp] = 0.
-        mask_thr[mask_thr > threshold_tmp] = 1.
-
-        if post_processing_method == GRAPH_BASED:
-            contour, _, _ = connect_points_graph_based(mask_thr, 3, alpha, beta, gamma)
-        elif post_processing_method == ACTIVE_CONTOURS:
-            contour = connect_with_active_contours(mask_thr, pred_class, alpha, beta, gamma)
-        elif post_processing_method == SKELETON:
-            contour = connect_with_skeleton(mask_thr)
-        else:
-            raise ValueError(f"Unavailable post-processing method '{post_processing}'")
-
-        threshold_tmp = threshold_tmp - 0.05
-        if threshold_tmp < 0.0:
-            break
-
-    contour = rescale_contour_fn(contour)
-    return contour
 
 
 def draw_bbox(mask, bbox, text=None):
@@ -190,11 +138,11 @@ def run_evaluation(outputs, classes, save_to=None, load_fn=None):
     contours = []
     for out in outputs:
         target = out["target"] * 255
-        box = out["box"]
         mask = out["mask"]
         pred_class = out['pred_cls']
 
-        contour = calculate_contour(pred_class, mask, box)
+        contour = calculate_contour(pred_class, mask)
+
         zeros = np.zeros_like(mask)
         clean_contour = draw_contour(zeros, contour, color=(255, 255, 255))
 
