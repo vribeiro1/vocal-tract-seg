@@ -43,6 +43,41 @@ def calculate_contours_with_skeleton(mask, threshold, **kwargs):
     return contour
 
 
+def upscale_mask(mask_, upscale):
+    mask = mask_.copy()
+
+    if upscale is None:
+        return mask, lambda x: x
+
+    s_out, _ = mask.shape
+    s_in = upscale
+    mask = cv2.resize(mask, (upscale, upscale), interpolation=cv2.INTER_CUBIC)
+    rescale_contour_fn = funcy.partial(rescale_contour, s_in=s_in, s_out=s_out)
+
+    return mask, rescale_contour_fn
+
+
+def _calculate_contour_threshold_loop(post_processing_fn, mask, threshold, pred_class, alpha, beta, gamma):
+    contour = []
+
+    while len(contour) < 10:
+        contour = post_processing_fn(
+            mask=mask,
+            threshold=threshold,
+            pred_class=pred_class,
+            r=3,
+            alpha=alpha,
+            beta=beta,
+            gamma=gamma
+        )
+
+        threshold = threshold - 0.05
+        if threshold < 0.0:
+            break
+
+    return contour
+
+
 def calculate_contour(pred_class, mask):
     if pred_class not in POST_PROCESSING:
         raise KeyError(
@@ -50,35 +85,29 @@ def calculate_contour(pred_class, mask):
         )
 
     post_proc = POST_PROCESSING[pred_class]
-    # If we upscale before post-processing, we need to define a function to rescale the generated
-    # contour. Else, we use an identity function as a placeholder.
-    if post_proc.upscale is not None:
-        s_out, _ = mask.shape
-        s_in = post_proc.upscale
-        mask = cv2.resize(mask, (post_proc.upscale, post_proc.upscale), interpolation=cv2.INTER_CUBIC)
-        rescale_contour_fn = funcy.partial(rescale_contour, s_in=s_in, s_out=s_out)
-    else:
-        rescale_contour_fn = lambda x: x
+    if post_proc.method not in METHODS:
+        raise ValueError(f"Unavailable post-processing method '{post_proc.method}'")
 
-    contour = []
-    threshold_tmp = post_proc.threshold
-    while len(contour) < 10:
-        if post_proc.method not in METHODS:
-            raise ValueError(f"Unavailable post-processing method '{post_proc.method}'")
+    max_upscale_iter = post_proc.max_upscale_iter
+    for i in range(1, max_upscale_iter + 1):
+        upscale = i * post_proc.upscale
+
+        # If we upscale before post-processing, we need to define a function to rescale the generated
+        # contour. Else, we use an identity function as a placeholder.
+        new_mask, rescale_contour_fn = upscale_mask(mask, upscale)
 
         post_processing_fn = METHODS[post_proc.method]
-        contour = post_processing_fn(
-            mask=mask,
-            threshold=threshold_tmp,
-            pred_class=pred_class,
-            r=3,
-            alpha=post_proc.alpha,
-            beta=post_proc.beta,
-            gamma=post_proc.gamma
+        contour = _calculate_contour_threshold_loop(
+            post_processing_fn,
+            new_mask,
+            post_proc.threshold,
+            pred_class,
+            post_proc.alpha,
+            post_proc.beta,
+            post_proc.gamma
         )
 
-        threshold_tmp = threshold_tmp - 0.05
-        if threshold_tmp < 0.0:
+        if len(contour) > 10:
             break
 
     contour = rescale_contour_fn(contour)

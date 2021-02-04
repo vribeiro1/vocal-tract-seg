@@ -17,6 +17,7 @@ PostProcessingCfg = namedtuple(
         "beta",
         "gamma",
         "upscale",
+        "max_upscale_iter",
         "threshold"
     ]
 )
@@ -29,6 +30,7 @@ POST_PROCESSING = {
     #     beta=10,
     #     gamma=0.05,
     #     upscale=256,
+    #     max_upscale_iter=3,
     #     threshold=0.4
     # ),
     LOWER_LIP: PostProcessingCfg(
@@ -37,6 +39,7 @@ POST_PROCESSING = {
         beta=10,
         gamma=0,
         upscale=256,
+        max_upscale_iter=3,
         threshold=0.4
     ),
     SOFT_PALATE: PostProcessingCfg(
@@ -45,6 +48,7 @@ POST_PROCESSING = {
         beta=1,
         gamma=0.05,
         upscale=256,
+        max_upscale_iter=3,
         threshold=0.3
     ),
     # TONGUE: PostProcessingCfg(
@@ -53,6 +57,7 @@ POST_PROCESSING = {
     #     beta=1,
     #     gamma=0.05,
     #     upscale=256,
+    #     max_upscale_iter=3,
     #     threshold=0.2
     # ),
     TONGUE: PostProcessingCfg(
@@ -61,6 +66,7 @@ POST_PROCESSING = {
         beta=10,
         gamma=0,
         upscale=256,
+        max_upscale_iter=3,
         threshold=0.2
     ),
     # UPPER_LIP: PostProcessingCfg(
@@ -69,6 +75,7 @@ POST_PROCESSING = {
     #     beta=1,
     #     gamma=0.05,
     #     upscale=256,
+    #     max_upscale_iter=3,
     #     threshold=0.4
     # ),
     UPPER_LIP: PostProcessingCfg(
@@ -77,6 +84,7 @@ POST_PROCESSING = {
         beta=10,
         gamma=0,
         upscale=256,
+        max_upscale_iter=3,
         threshold=0.4
     ),
 }
