@@ -15,6 +15,7 @@ from torch.utils.data import DataLoader
 from torchvision.models.detection.mask_rcnn import maskrcnn_resnet50_fpn
 from tqdm import tqdm
 
+from bs_regularization import regularize_Bsplines
 from connect_points import draw_contour
 from dataset import VocalTractMaskRCNNDataset
 from evaluation import calculate_contour, draw_bbox
@@ -147,7 +148,7 @@ def run_inference(model, dataloader, outputs_dir, class_map, threshold=None, dev
                     mask_arr = mask_arr.astype(np.uint8)
 
                     mask_img = Image.fromarray(mask_arr)
-                    mask_img = draw_bbox(mask_img, box, "%.4f" % score)
+                    # mask_img = draw_bbox(mask_img, box, "%.4f" % score)
 
                     mask_dirname = os.path.join(
                         outputs_dir,
@@ -177,6 +178,54 @@ def run_inference(model, dataloader, outputs_dir, class_map, threshold=None, dev
     return return_outputs
 
 
+def load_outputs_from_directory(outputs_dir, subj_sequences):
+    outputs = []
+
+    sequences = []
+    for subj, seqs in subj_sequences.items():
+        use_seqs = seqs
+        if len(seqs) == 0:
+            # Use all sequences
+            use_seqs = filter(
+                lambda s: s.startswith("S") and os.path.isdir(os.path.join(datadir, subj, s)),
+                os.listdir(os.path.join(datadir, subj))
+            )
+
+        sequences.extend([(subj, seq) for seq in use_seqs])
+
+    for subject, sequence in sequences:
+        seq_dir = os.path.join(outputs_dir, subject, sequence)
+
+        for filepath in glob(os.path.join(seq_dir, "*.png")):
+            basename = os.path.basename(filepath)
+            name, _ = basename.split(".")
+            instance_number, pred_class = name.split("_")
+
+            img = Image.open(filepath).convert("L")
+            img_arr = np.array(img) / 255.
+
+            out = {
+                "subject": subject,
+                "sequence": sequence,
+                "instance_number": int(instance_number),
+                "dcm_filepath": None,
+                "box": None,
+                "label": None,
+                "pred_cls": pred_class,
+                "score": None,
+                "mask": img_arr
+            }
+
+            outputs.append(out)
+
+    return outputs
+
+
+def smooth_contour(contour):
+    resX, resY = regularize_Bsplines(contour, 3)
+    return np.array([resX, resY]).transpose(1, 0)
+
+
 def main(cfg):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     num_classes = len(cfg["classes"])
@@ -197,6 +246,8 @@ def main(cfg):
         collate_fn=dataset.collate_fn
     )
 
+    inference_directory = cfg.get("inference_dir")
+
     model = maskrcnn_resnet50_fpn(pretrained=True)
     if cfg["state_dict_fpath"] is not None:
         state_dict = torch.load(cfg["state_dict_fpath"], map_location=device)
@@ -206,17 +257,20 @@ def main(cfg):
     if not os.path.exists(cfg["save_to"]):
         os.mkdir(cfg["save_to"])
 
-    class_map = {i: c for c, i in dataset.classes_dict.items()}
-    outputs = run_inference(
-        model=model,
-        dataloader=dataloader,
-        device=device,
-        class_map=class_map,
-        outputs_dir=os.path.join(cfg["save_to"], "inference")
-    )
+    if inference_directory is None:
+        class_map = {i: c for c, i in dataset.classes_dict.items()}
+        outputs = run_inference(
+            model=model,
+            dataloader=dataloader,
+            device=device,
+            class_map=class_map,
+            outputs_dir=os.path.join(cfg["save_to"], "inference")
+        )
+    else:
+        outputs = load_outputs_from_directory(inference_directory, cfg["sequences"])
 
     contours_per_image = {}
-    for out in outputs:
+    for out in tqdm(outputs, desc="Calculating contours"):
         subject = out["subject"]
         sequence = out["sequence"]
         instance_number = out["instance_number"]
@@ -225,6 +279,15 @@ def main(cfg):
         pred_class = out["pred_cls"]
 
         contour = calculate_contour(pred_class, mask)
+        contour = smooth_contour(contour)
+
+        outputs_dir = os.path.join(cfg["save_to"], "inference_contours", subject, sequence)
+        if not os.path.exists(outputs_dir):
+            os.makedirs(outputs_dir)
+
+        npy_filepath = os.path.join(outputs_dir, f"{'%04d' % instance_number}_{pred_class}.npy")
+        with open(npy_filepath, "wb") as f:
+            np.save(f, contour)
 
         if subject not in contours_per_image:
             contours_per_image[subject] = {}
@@ -240,9 +303,7 @@ def main(cfg):
     for subject, sequences in contours_per_image.items():
         for sequence, images in sequences.items():
             for instance_number, contours in images.items():
-                outputs_dir = os.path.join(
-                    cfg["save_to"], "inference_contours", subject, sequence
-                )
+                outputs_dir = os.path.join(cfg["save_to"], "inference_contours", subject, sequence)
                 if not os.path.exists(outputs_dir):
                     os.makedirs(outputs_dir)
 
@@ -251,10 +312,6 @@ def main(cfg):
                 )))
                 img_filepath = os.path.join(outputs_dir, f"{'%04d' % instance_number}.png")
                 save_image_with_contours(img, img_filepath, contours)
-
-                npy_filepath = os.path.join(outputs_dir, f"{'%04d' % out['instance_number']}_{pred_class}.npy")
-                with open(npy_filepath, "wb") as f:
-                    np.save(f, contour)
 
 
 if __name__ == "__main__":
