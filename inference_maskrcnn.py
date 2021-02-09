@@ -187,8 +187,8 @@ def load_outputs_from_directory(outputs_dir, subj_sequences):
         if len(seqs) == 0:
             # Use all sequences
             use_seqs = filter(
-                lambda s: s.startswith("S") and os.path.isdir(os.path.join(datadir, subj, s)),
-                os.listdir(os.path.join(datadir, subj))
+                lambda s: s.startswith("S") and os.path.isdir(os.path.join(outputs_dir, subj, s)),
+                os.listdir(os.path.join(outputs_dir, subj))
             )
 
         sequences.extend([(subj, seq) for seq in use_seqs])
@@ -278,16 +278,17 @@ def main(cfg):
         mask = out["mask"]
         pred_class = out["pred_cls"]
 
-        contour = calculate_contour(pred_class, mask)
-        contour = smooth_contour(contour)
-
         outputs_dir = os.path.join(cfg["save_to"], "inference_contours", subject, sequence)
         if not os.path.exists(outputs_dir):
             os.makedirs(outputs_dir)
 
-        npy_filepath = os.path.join(outputs_dir, f"{'%04d' % instance_number}_{pred_class}.npy")
-        with open(npy_filepath, "wb") as f:
-            np.save(f, contour)
+        contour = calculate_contour(pred_class, mask)
+        if len(contour) > 0:
+            contour = smooth_contour(contour)
+
+            npy_filepath = os.path.join(outputs_dir, f"{'%04d' % instance_number}_{pred_class}.npy")
+            with open(npy_filepath, "wb") as f:
+                np.save(f, contour)
 
         if subject not in contours_per_image:
             contours_per_image[subject] = {}
