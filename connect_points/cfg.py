@@ -42,14 +42,23 @@ POST_PROCESSING = {
         max_upscale_iter=3,
         threshold=0.4
     ),
+    # SOFT_PALATE: PostProcessingCfg(
+    #     method=ACTIVE_CONTOURS,
+    #     alpha=1,
+    #     beta=1,
+    #     gamma=0.05,
+    #     upscale=256,
+    #     max_upscale_iter=3,
+    #     threshold=0.3
+    # ),
     SOFT_PALATE: PostProcessingCfg(
-        method=ACTIVE_CONTOURS,
+        method=GRAPH_BASED,
         alpha=1,
-        beta=1,
-        gamma=0.05,
+        beta=10,
+        gamma=0,
         upscale=256,
         max_upscale_iter=3,
-        threshold=0.3
+        threshold=0.1
     ),
     # TONGUE: PostProcessingCfg(
     #     method=ACTIVE_CONTOURS,

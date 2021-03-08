@@ -1,6 +1,8 @@
-import numpy as np
 import cv2
 import funcy
+import numpy as np
+
+from scipy.ndimage import binary_fill_holes
 
 from .active_contours import connect_with_active_contours
 from .cfg import *
@@ -21,8 +23,12 @@ def threshold_array(arr_, threshold, high=1., low=0.):
     return arr
 
 
-def calculate_contours_with_graph(mask, threshold, r, alpha, beta, gamma, **kwargs):
+def calculate_contours_with_graph(mask, threshold, r, alpha, beta, gamma, pred_class, **kwargs):
     mask_thr = threshold_array(mask, threshold)
+
+    if pred_class == SOFT_PALATE:
+        mask_thr = binary_fill_holes(mask_thr)
+
     contour, _, _ = connect_points_graph_based(mask_thr, r, alpha, beta, gamma)
 
     return contour
@@ -58,9 +64,11 @@ def upscale_mask(mask_, upscale):
 
 
 def _calculate_contour_threshold_loop(post_processing_fn, mask, threshold, pred_class, alpha, beta, gamma):
+    min_length = 10
+    min_threshold = 0.00005
     contour = []
 
-    while len(contour) < 10:
+    while len(contour) < min_length:
         contour = post_processing_fn(
             mask=mask,
             threshold=threshold,
@@ -71,8 +79,8 @@ def _calculate_contour_threshold_loop(post_processing_fn, mask, threshold, pred_
             gamma=gamma
         )
 
-        threshold = threshold - 0.05
-        if threshold < 0.0:
+        threshold = threshold * 0.9
+        if threshold < min_threshold:
             break
 
     return contour
