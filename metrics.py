@@ -92,5 +92,6 @@ def evaluate_model(targets, contours):
 
     mean = np.mean(p2cps)
     sigma = np.std(p2cps)
+    median = np.median(p2cps)
 
     return mean, sigma

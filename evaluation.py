@@ -181,8 +181,8 @@ def run_evaluation(outputs, classes, save_to=None, load_fn=None):
 
         cls_targets = [t[1] for t in filtered]
         cls_contours = [t[2] for t in filtered]
-        cls_mean, cls_std = evaluate_model(cls_targets, cls_contours)
+        cls_mean, cls_std, cls_median = evaluate_model(cls_targets, cls_contours)
 
-        results[cls_] = (cls_mean, cls_std)
+        results[cls_] = (cls_mean, cls_std, cls_median)
 
     return results
