@@ -70,9 +70,10 @@ def run_test(epoch, model, dataloader, outputs_dir, class_map, threshold=None, d
 
             for j, (im_info, im_outputs, targets_dict) in enumerate(zip(info, outputs, targets_dict)):
                 targets = targets_dict["masks"]
-                bg, llip, sp, tongue, ulip = targets
+                bg, llip, pharynx, sp, tongue, ulip = targets
                 targets = {
                     "lower-lip": llip,
+                    "pharynx": pharynx,
                     "soft-palate": sp,
                     "tongue": tongue,
                     "upper-lip": ulip
