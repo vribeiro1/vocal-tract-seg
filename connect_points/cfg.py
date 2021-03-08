@@ -1,6 +1,7 @@
 from collections import namedtuple
 
 LOWER_LIP = "lower-lip"
+PHARYNX = "pharynx"
 SOFT_PALATE = "soft-palate"
 TONGUE = "tongue"
 UPPER_LIP = "upper-lip"
@@ -34,6 +35,15 @@ POST_PROCESSING = {
     #     threshold=0.4
     # ),
     LOWER_LIP: PostProcessingCfg(
+        method=GRAPH_BASED,
+        alpha=1,
+        beta=10,
+        gamma=0,
+        upscale=256,
+        max_upscale_iter=3,
+        threshold=0.4
+    ),
+    PHARYNX: PostProcessingCfg(
         method=GRAPH_BASED,
         alpha=1,
         beta=10,

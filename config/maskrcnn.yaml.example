@@ -24,6 +24,7 @@ classes:
     # - epiglottis
     # - hyoid-bone
     - lower-lip
+    - pharynx
     - soft-palate
     # - thyroid-cartilage
     - tongue

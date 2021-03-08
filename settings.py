@@ -9,6 +9,7 @@ VALID = "validation"
 TEST = "test"
 
 LOWER_LIP = "lower-lip"
+PHARYNX = "pharynx"
 SOFT_PALATE = "soft-palate"
 TONGUE = "tongue"
 UPPER_LIP = "upper-lip"
