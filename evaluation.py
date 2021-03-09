@@ -70,14 +70,6 @@ def run_test(epoch, model, dataloader, outputs_dir, class_map, threshold=None, d
 
             for j, (im_info, im_outputs, targets_dict) in enumerate(zip(info, outputs, targets_dict)):
                 targets = targets_dict["masks"]
-                bg, llip, pharynx, sp, tongue, ulip = targets
-                targets = {
-                    "lower-lip": llip,
-                    "pharynx": pharynx,
-                    "soft-palate": sp,
-                    "tongue": tongue,
-                    "upper-lip": ulip
-                }
 
                 zipped = list(zip(
                     im_outputs["boxes"],
@@ -91,7 +83,7 @@ def run_test(epoch, model, dataloader, outputs_dir, class_map, threshold=None, d
                     art_list = funcy.lfilter(lambda t: t[1].item() == c_idx, zipped)
                     if len(art_list) > 0:
                         art = max(art_list, key=lambda t: t[2])
-                        detected.append(art + (targets[c],))
+                        detected.append(art + (targets[c_idx],))
 
                 for box, label, score, mask, target in detected:
                     mask_arr = mask.squeeze(dim=0).cpu().numpy()

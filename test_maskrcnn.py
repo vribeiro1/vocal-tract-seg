@@ -65,20 +65,6 @@ def main(cfg):
     with open(results_filepath, "w") as f:
         json.dump(results, f)
 
-    llip_mean, llip_std, _ = results[LOWER_LIP]
-    soft_palate_mean, soft_palate_std, _ = results[SOFT_PALATE]
-    tongue_mean, tongue_std, _ = results[TONGUE]
-    ulip_mean, ulip_std, _ = results[UPPER_LIP]
-
-    print(f"""
-Results:
-
-Lower lip: Mean_P2CP = {llip_mean} +- {llip_std}
-Soft palate: Mean_P2CP = {soft_palate_mean} +- {soft_palate_std}
-Tongue: Mean_P2CP = {tongue_mean} +- {tongue_std}
-Upper lip: Mean_P2CP = {ulip_mean} +- {ulip_std}
-""")
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
