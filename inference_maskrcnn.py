@@ -23,10 +23,12 @@ from helpers import set_seeds
 from settings import *
 
 COLORS = {
-    "lower-lip": (255, 0, 0),
-    "soft-palate": (0, 0, 255),
-    "tongue": (255, 255, 0),
-    "upper-lip": (0, 255, 0)
+    "epiglottis": (153, 204, 0),
+    "lower-lip": (102, 255, 51),
+    "upper-lip": (255, 51, 204),
+    "tongue": (255, 102, 0),
+    "soft-palate": (102, 102, 255),
+    "pharynx": (255, 128, 128)
 }
 
 
@@ -178,7 +180,7 @@ def run_inference(model, dataloader, outputs_dir, class_map, threshold=None, dev
     return return_outputs
 
 
-def load_outputs_from_directory(outputs_dir, subj_sequences):
+def load_outputs_from_directory(outputs_dir, subj_sequences, classes):
     outputs = []
 
     sequences = []
@@ -200,6 +202,9 @@ def load_outputs_from_directory(outputs_dir, subj_sequences):
             basename = os.path.basename(filepath)
             name, _ = basename.split(".")
             instance_number, pred_class = name.split("_")
+
+            if pred_class not in classes:
+                continue
 
             img = Image.open(filepath).convert("L")
             img_arr = np.array(img) / 255.
@@ -267,7 +272,7 @@ def main(cfg):
             outputs_dir=os.path.join(cfg["save_to"], "inference")
         )
     else:
-        outputs = load_outputs_from_directory(inference_directory, cfg["sequences"])
+        outputs = load_outputs_from_directory(inference_directory, cfg["sequences"], cfg["classes"])
 
     contours_per_image = {}
     for out in tqdm(outputs, desc="Calculating contours"):
