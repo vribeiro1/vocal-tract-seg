@@ -13,6 +13,9 @@ def get_box_from_mask_tensor(mask_, margin=0):
     mask_np = mask.astype(np.uint8)
 
     props = regionprops(mask_np)
+    if len(props) == 0:
+        return
+
     y0, x0, y1, x1 = props[0]["bbox"]
     return [x0 - margin, y0 - margin, x1 + margin, y1 + margin]
 
@@ -22,6 +25,9 @@ def get_general_extremities(mask_arr):
     ext1, ext2, _ = detect_tails(c, contour)
 
     box = get_box_from_mask_tensor(mask_arr)
+    if box is None:
+        return None, None, None
+
     x0, y0, x1, y1 = box
     ext3 = (x0, y0)
 
@@ -31,6 +37,9 @@ def get_general_extremities(mask_arr):
 def get_soft_palate_extremities(mask_arr, min_diff=4):
     h, w = mask_arr.shape
     box = get_box_from_mask_tensor(mask_arr)
+    if box is None:
+        return None, None, None
+
     x0, y0, x1, y1 = box
 
     x0_arr = mask_arr[:, x0]
@@ -91,11 +100,11 @@ def get_circle(p1, p2, p3):
     return (xc, yc), r
 
 
-def connect_with_active_contours(mask_, mask_thr_, art, alpha, beta, gamma, n_samples=400, max_iter=2500):
-    mask = mask_.copy()
-    mask_thr = mask_thr_.copy()
+def get_open_initial_curve(mask_arr, articulator):
+    ext1, ext2, ext3 = get_extremities(articulator, mask_arr)
+    if any(funcy.lmap(lambda e: e is None, [ext1, ext2, ext3])):
+        return
 
-    ext1, ext2, ext3 = get_extremities(art, mask_thr)
     (x_c, y_c), radius = get_circle(ext1, ext2, ext3)
 
     x1, y1 = ext1
@@ -108,13 +117,37 @@ def connect_with_active_contours(mask_, mask_thr_, art, alpha, beta, gamma, n_sa
     cos2 = (x2 - x_c) / radius
     theta2 = np.arctan2(sin2, cos2)
 
-    if art != "soft-palate":
+    if articulator != "soft-palate":
         theta1 += 2 * np.pi
 
     s = np.linspace(theta2, theta1, n_samples)
     r = y_c + radius * np.sin(s)
     c = x_c + radius * np.cos(s)
     init = np.array([r, c]).T
+
+    return init
+
+
+def get_closed_initial_curve(mask_arr):
+    box = get_box_from_mask_tensor(mask_arr, margin=5)
+    if box is None:
+        return
+
+    x0, y0, x1, y1 = box
+    x_c = x0 + (x1 - x0) / 2
+    y_c = y0 + (y1 - y0) / 2
+    radius = max((x1 - x0), (y1 - y0)) / 2
+
+    s = np.linspace(0, 2 * np.pi, 400)
+    r = y_c + radius * np.sin(s)
+    c = x_c + radius * np.cos(s)
+    init = np.array([r, c]).T
+
+    return init
+
+
+def connect_with_active_contours(mask_, init, alpha, beta, gamma, n_samples=400, max_iter=2500, boundary_condition="fixed"):
+    mask = mask_.copy()
 
     snake = active_contour(
         mask,
@@ -123,7 +156,7 @@ def connect_with_active_contours(mask_, mask_thr_, art, alpha, beta, gamma, n_sa
         beta=beta,
         gamma=gamma,
         max_iterations=max_iter,
-        boundary_condition="fixed"
+        boundary_condition=boundary_condition
     )
 
     contour = np.zeros_like(snake)

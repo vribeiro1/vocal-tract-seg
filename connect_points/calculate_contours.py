@@ -3,10 +3,11 @@ import funcy
 import numpy as np
 
 from scipy.ndimage import binary_fill_holes
+from skimage.morphology import skeletonize
 
-from .active_contours import connect_with_active_contours
+from .active_contours import connect_with_active_contours, get_open_initial_curve, get_closed_initial_curve
 from .cfg import *
-from .graph_based import connect_points_graph_based
+from .graph_based import connect_points_graph_based, detect_tails, detect_extremities_on_axis, find_contour_points
 from .skeleton import connect_with_skeleton
 
 
@@ -23,21 +24,49 @@ def threshold_array(arr_, threshold, high=1., low=0.):
     return arr
 
 
-def calculate_contours_with_graph(mask, threshold, r, alpha, beta, gamma, pred_class, **kwargs):
+def calculate_contours_with_graph(mask, threshold, r, alpha, beta, gamma, articulator, **kwargs):
     mask_thr = threshold_array(mask, threshold)
 
-    if pred_class == SOFT_PALATE:
+    if articulator == SOFT_PALATE:
         mask_thr = binary_fill_holes(mask_thr)
+    mask_thr = skeletonize(mask_thr).astype(np.uint8)
 
-    contour, _, _ = connect_points_graph_based(mask_thr, r, alpha, beta, gamma)
+    contour, c = find_contour_points(mask_thr)
+    if articulator in (SOFT_PALATE,):
+        source, sink = detect_extremities_on_axis(mask_thr, axis=0)
+    elif articulator in (PHARYNX,):
+        source, sink = detect_extremities_on_axis(mask_thr, axis=1)
+    else:
+        source, sink, _ = detect_tails(c, contour)
+
+    if source is None or sink is None:
+        return []
+
+    contour, _, _ = connect_points_graph_based(mask_thr, contour, r, alpha, beta, gamma, tails=(source, sink))
 
     return contour
 
 
-def calculate_contours_with_active_contours(mask, threshold, alpha, beta, gamma, pred_class, **kwargs):
+def calculate_contours_with_active_contours(mask, threshold, alpha, beta, gamma, articulator, **kwargs):
     mask_ = mask.copy()
-    mask_thr = threshold_array(mask, threshold)
-    contour = connect_with_active_contours(mask, mask_thr, pred_class, alpha, beta, gamma, max_iter=500)
+    mask_thr = threshold_array(mask, threshold).copy()
+
+    if articulator in (UPPER_LIP, LOWER_LIP, TONGUE, SOFT_PALATE):
+        init = get_open_initial_curve(mask_thr, articulator)
+        boundary_condition = "fixed"
+    elif articulator in (ARYTENOID_MUSCLE, HYOID_BONE, THYROID_CARTILAGE, VOCAL_FOLDS):
+        init = get_closed_initial_curve(mask_thr)
+        boundary_condition = "free"
+    else:
+        raise NotImplemented
+
+    if init is None:
+        return []
+
+    contour = connect_with_active_contours(
+        mask, init, alpha, beta, gamma,
+        max_iter=500, boundary_condition=boundary_condition
+    )
 
     return contour
 
@@ -63,7 +92,7 @@ def upscale_mask(mask_, upscale):
     return mask, rescale_contour_fn
 
 
-def _calculate_contour_threshold_loop(post_processing_fn, mask, threshold, pred_class, alpha, beta, gamma):
+def _calculate_contour_threshold_loop(post_processing_fn, mask, threshold, articulator, alpha, beta, gamma):
     min_length = 10
     min_threshold = 0.00005
     contour = []
@@ -72,7 +101,7 @@ def _calculate_contour_threshold_loop(post_processing_fn, mask, threshold, pred_
         contour = post_processing_fn(
             mask=mask,
             threshold=threshold,
-            pred_class=pred_class,
+            articulator=articulator,
             r=3,
             alpha=alpha,
             beta=beta,
@@ -86,13 +115,13 @@ def _calculate_contour_threshold_loop(post_processing_fn, mask, threshold, pred_
     return contour
 
 
-def calculate_contour(pred_class, mask):
-    if pred_class not in POST_PROCESSING:
+def calculate_contour(articulator, mask):
+    if articulator not in POST_PROCESSING:
         raise KeyError(
-            f"Class '{pred_class}' does not have post-processing parameters configured"
+            f"Class '{articulator}' does not have post-processing parameters configured"
         )
 
-    post_proc = POST_PROCESSING[pred_class]
+    post_proc = POST_PROCESSING[articulator]
     if post_proc.method not in METHODS:
         raise ValueError(f"Unavailable post-processing method '{post_proc.method}'")
 
@@ -109,7 +138,7 @@ def calculate_contour(pred_class, mask):
             post_processing_fn,
             new_mask,
             post_proc.threshold,
-            pred_class,
+            articulator,
             post_proc.alpha,
             post_proc.beta,
             post_proc.gamma

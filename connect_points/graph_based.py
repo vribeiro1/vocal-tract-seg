@@ -86,6 +86,9 @@ def shortest_path(edges, source, sink):
 # detect a maximal gap. We think that the points separated by this gap are the tails,
 # but it can be not the case in many cases. Pay attention.
 def detect_tails(point, otherPoints):
+    if len(otherPoints) == 0:
+        return (), (), None
+
     anglesAndPoints = []
     for otherPoint in otherPoints:
         angle = math.atan2(otherPoint.y - point.y, otherPoint.x - point.x)
@@ -114,6 +117,18 @@ def detect_tails(point, otherPoints):
     dist = int(pt1.distanceTo(pt2))
 
     return (pt1.x, pt1.y), (pt2.x, pt2.y), dist
+
+
+def detect_extremities_on_axis(mask_arr, axis=0):
+    y, x = np.where(skeletonize(mask_arr) == 1)
+    skeleton = list(zip(x, y))
+    if len(skeleton) == 0:
+        return None, None
+
+    pt1 = min(skeleton, key=lambda p: p[axis])
+    pt2 = max(skeleton, key=lambda p: p[axis])
+
+    return pt1, pt2
 
 
 def construct_graph(contour, mask, r, alpha, beta, gamma, prev_contour=None):
@@ -184,32 +199,18 @@ def find_contour_points(img, threshDistFactor=2):
     return contour, c
 
 
-def find_ends(img, r):
-    img = 255 * img
-
-    [contour, c] = find_contour_points(img)
-    if len(contour) == 0:
-        return [],[],[]
-
-    source, sink, r = detect_tails(c, contour)
-    return [source, sink]
-
-
-def connect_points_graph_based(mask, r, alpha, beta, gamma, prev_contour=None):
-    mask = skeletonize(mask).astype(np.uint8)
-
+def connect_points_graph_based(mask, contour, r, alpha, beta, gamma, tails, prev_contour=None):
     if prev_contour is None:
         prev_contour = []
 
-    contour, c = find_contour_points(mask)
     if len(contour) == 0:
-        return [], [], []
+        return [], (), ()
 
-    source, sink, rr = detect_tails(c, contour)
     # Distance betweent the tails is decreased by 1, to not connect the
     # tails, but connect for sure all another points
-
     edges = construct_graph(contour, mask, r - 1, alpha, beta, gamma, prev_contour=prev_contour)
+
+    source, sink = tails
     names = shortest_path(edges, pt_to_name(source), pt_to_name(sink))
     if type(names) is float:
         return [], [], []
