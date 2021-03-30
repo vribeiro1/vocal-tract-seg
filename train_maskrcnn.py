@@ -89,7 +89,7 @@ def main(_run, datadir, batch_size, n_epochs, patience, learning_rate,
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     num_classes = len(classes)
 
-    writer = SummaryWriter(os.path.join(BASE_DIR, "runs", f"experiment-{_run._id}"))
+    writer = SummaryWriter(os.path.join(fs_observer.dir, f"experiment-{_run._id}"))
     best_model_path = os.path.join(fs_observer.dir, "best_model.pth")
     last_model_path = os.path.join(fs_observer.dir, "last_model.pth")
 
