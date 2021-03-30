@@ -11,5 +11,5 @@ __pycache__
 config/*
 !config/*.yaml.example
 
-results
-runs
+results*
+runs*
