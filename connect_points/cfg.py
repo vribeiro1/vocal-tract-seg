@@ -14,6 +14,7 @@ VOCAL_FOLDS = "vocal-folds"
 GRAPH_BASED = "graph-based"
 ACTIVE_CONTOURS = "active-contours"
 SKELETON = "skeletonize"
+BORDER_METHOD = "border-method"
 
 PostProcessingCfg = namedtuple(
     "PostProcessingCfg",
@@ -31,11 +32,11 @@ PostProcessingCfg = namedtuple(
 # Post-processing configuration per class
 POST_PROCESSING = {
     ARYTENOID_MUSCLE: PostProcessingCfg(
-        method=ACTIVE_CONTOURS,
+        method=BORDER_METHOD,
         alpha=1,
         beta=1,
         gamma=0.05,
-        upscale=256,
+        upscale=512,
         max_upscale_iter=3,
         threshold=0.3
     ),
@@ -47,18 +48,19 @@ POST_PROCESSING = {
         gamma=0,
         upscale=256,
         max_upscale_iter=3,
-        threshold=0.5
+        threshold=0.1
     ),
 
-    # LOWER_LIP: PostProcessingCfg(
-    #     method=ACTIVE_CONTOURS,
-    #     alpha=10,
-    #     beta=10,
-    #     gamma=0.05,
-    #     upscale=256,
-    #     max_upscale_iter=3,
-    #     threshold=0.4
-    # ),
+    HYOID_BONE: PostProcessingCfg(
+        method=BORDER_METHOD,
+        alpha=1,
+        beta=1,
+        gamma=0.05,
+        upscale=512,
+        max_upscale_iter=3,
+        threshold=0.6
+    ),
+
     LOWER_LIP: PostProcessingCfg(
         method=GRAPH_BASED,
         alpha=1,
@@ -98,24 +100,15 @@ POST_PROCESSING = {
     ),
 
     THYROID_CARTILAGE: PostProcessingCfg(
-        method=ACTIVE_CONTOURS,
+        method=BORDER_METHOD,
         alpha=1,
         beta=1,
         gamma=0.05,
-        upscale=256,
+        upscale=512,
         max_upscale_iter=3,
         threshold=0.3
     ),
 
-    # TONGUE: PostProcessingCfg(
-    #     method=ACTIVE_CONTOURS,
-    #     alpha=1,
-    #     beta=1,
-    #     gamma=0.05,
-    #     upscale=256,
-    #     max_upscale_iter=3,
-    #     threshold=0.2
-    # ),
     TONGUE: PostProcessingCfg(
         method=GRAPH_BASED,
         alpha=1,
@@ -146,12 +139,12 @@ POST_PROCESSING = {
     ),
 
     VOCAL_FOLDS: PostProcessingCfg(
-        method=ACTIVE_CONTOURS,
+        method=GRAPH_BASED,
         alpha=1,
-        beta=1,
-        gamma=0.05,
+        beta=10,
+        gamma=0,
         upscale=256,
         max_upscale_iter=3,
-        threshold=0.3
+        threshold=0.2
     ),
 }

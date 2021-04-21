@@ -3,12 +3,14 @@ import funcy
 import numpy as np
 
 from scipy.ndimage import binary_fill_holes
+from scipy.signal import convolve2d
+from skimage.measure import regionprops
 from skimage.morphology import skeletonize
 
 from .active_contours import connect_with_active_contours, get_open_initial_curve, get_closed_initial_curve
 from .cfg import *
 from .graph_based import connect_points_graph_based, detect_tails, detect_extremities_on_axis, find_contour_points
-from .skeleton import connect_with_skeleton
+from .skeleton import connect_with_skeleton, skeleton_sort
 
 
 def rescale_contour(contour, s_in, s_out):
@@ -32,9 +34,9 @@ def calculate_contours_with_graph(mask, threshold, r, alpha, beta, gamma, articu
     mask_thr = skeletonize(mask_thr).astype(np.uint8)
 
     contour, c = find_contour_points(mask_thr)
-    if articulator in (SOFT_PALATE,):
+    if articulator in (SOFT_PALATE, VOCAL_FOLDS):
         source, sink = detect_extremities_on_axis(mask_thr, axis=0)
-    elif articulator in (PHARYNX,):
+    elif articulator in (PHARYNX, EPIGLOTTIS):
         source, sink = detect_extremities_on_axis(mask_thr, axis=1)
     else:
         source, sink, _ = detect_tails(c, contour)
@@ -56,7 +58,7 @@ def calculate_contours_with_active_contours(mask, threshold, alpha, beta, gamma,
         boundary_condition = "fixed"
     elif articulator in (ARYTENOID_MUSCLE, HYOID_BONE, THYROID_CARTILAGE, VOCAL_FOLDS):
         init = get_closed_initial_curve(mask_thr)
-        boundary_condition = "free"
+        boundary_condition = "periodic"
     else:
         raise NotImplemented
 
@@ -64,7 +66,7 @@ def calculate_contours_with_active_contours(mask, threshold, alpha, beta, gamma,
         return []
 
     contour = connect_with_active_contours(
-        mask, init, alpha, beta, gamma,
+        mask_thr, init, alpha, beta, gamma,
         max_iter=500, boundary_condition=boundary_condition
     )
 
@@ -74,6 +76,51 @@ def calculate_contours_with_active_contours(mask, threshold, alpha, beta, gamma,
 def calculate_contours_with_skeleton(mask, threshold, **kwargs):
     mask_thr = threshold_array(mask, threshold)
     contour = connect_with_skeleton(mask_thr)
+
+    return contour
+
+
+def calculate_contours_with_border_method(mask, threshold, **kwargs):
+    mask_thr = threshold_array(mask, threshold)
+    props = regionprops(mask_thr.astype(np.uint8))
+    y0, x0, y1, x1 = props[0]["bbox"]
+
+    # The convolutional kernel counts the number of white pixels in the neighboorhood.
+    conv_kernel = np.array([
+        [1., 1., 1.],
+        [1., 0., 0.],
+        [1., 1., 1.]
+    ])
+
+    margin = 3
+    region_mask_arr = mask_thr[y0 - margin:y1 + margin, x0 - margin:x1 + margin]
+
+    region_conv_mask_arr = convolve2d(conv_kernel, region_mask_arr)
+    region_conv_mask_arr = region_conv_mask_arr[1:-1, 1:-1]
+
+    conv_mask_arr = np.zeros_like(mask_thr)
+    conv_mask_arr[y0 - margin:y1 + margin, x0 - margin: x1 + margin] = region_conv_mask_arr
+
+    border_mask_arr = conv_mask_arr.copy()
+
+    # If convolution value is maximum, all neighboors are white, on the other side, if the
+    # convolution value is minimum, all neighbors are black. In both cases, the pixel is not on
+    # the border. Thus, we set them as zero. Pixels with an intermediate convolution value
+    # are set to one.
+
+    max_val = conv_kernel.sum()
+    border_mask_arr[border_mask_arr == max_val] = 0
+    border_mask_arr[(border_mask_arr > 0) & (border_mask_arr < max_val)] = 1
+
+    skeleton = skeletonize(border_mask_arr)
+    y, x = np.where(skeleton == True)
+    unsorted_points = list(zip(x, y))
+
+    if len(unsorted_points) == 0:
+        return []
+
+    origin = unsorted_points[0]
+    contour = np.array(skeleton_sort(unsorted_points, origin))
 
     return contour
 
@@ -157,5 +204,6 @@ def calculate_contour(articulator, mask):
 METHODS = {
     GRAPH_BASED: calculate_contours_with_graph,
     ACTIVE_CONTOURS: calculate_contours_with_active_contours,
-    SKELETON: calculate_contours_with_skeleton
+    SKELETON: calculate_contours_with_skeleton,
+    BORDER_METHOD: calculate_contours_with_border_method
 }

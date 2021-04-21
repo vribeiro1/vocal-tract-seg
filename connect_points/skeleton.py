@@ -6,11 +6,11 @@ from skimage.morphology import skeletonize
 
 
 def _remove_duplicates(iterable):
-        seen = set()
-        return [item for item in iterable if not (item in seen or seen.add(item))]
+    seen = set()
+    return [item for item in iterable if not (item in seen or seen.add(item))]
 
 
-def _skeleton_sort(points_, origin, max_dist=5):
+def skeleton_sort(points_, origin, max_dist=5):
     points = _remove_duplicates(deepcopy(points_))
     curr_p = origin
 
@@ -34,6 +34,6 @@ def connect_with_skeleton(mask):
     skeleton = skeletonize(mask)
     y, x = np.where(skeleton == True)
     unsorted_points = list(zip(x, y))
-    sorted_points = _skeleton_sort(unsorted_points, (0, im_W))
+    sorted_points = skeleton_sort(unsorted_points, (0, im_W))
 
     return np.array(sorted_points)
