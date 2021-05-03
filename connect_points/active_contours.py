@@ -1,5 +1,6 @@
 import pdb
 
+import funcy
 import numpy as np
 
 from skimage.measure import regionprops
@@ -100,7 +101,7 @@ def get_circle(p1, p2, p3):
     return (xc, yc), r
 
 
-def get_open_initial_curve(mask_arr, articulator):
+def get_open_initial_curve(mask_arr, articulator, n_samples=100):
     ext1, ext2, ext3 = get_extremities(articulator, mask_arr)
     if any(funcy.lmap(lambda e: e is None, [ext1, ext2, ext3])):
         return
@@ -128,7 +129,7 @@ def get_open_initial_curve(mask_arr, articulator):
     return init
 
 
-def get_closed_initial_curve(mask_arr):
+def get_closed_initial_curve(mask_arr, n_samples=100):
     box = get_box_from_mask_tensor(mask_arr, margin=5)
     if box is None:
         return
@@ -138,7 +139,7 @@ def get_closed_initial_curve(mask_arr):
     y_c = y0 + (y1 - y0) / 2
     radius = max((x1 - x0), (y1 - y0)) / 2
 
-    s = np.linspace(0, 2 * np.pi, 400)
+    s = np.linspace(0, 2 * np.pi, n_samples)
     r = y_c + radius * np.sin(s)
     c = x_c + radius * np.cos(s)
     init = np.array([r, c]).T

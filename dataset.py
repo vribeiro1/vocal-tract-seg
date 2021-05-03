@@ -235,10 +235,10 @@ class VocalTractMaskRCNNDataset(Dataset):
         g_arr = self.to_tensor(g)
 
         r = self.read_dcm(R_filepath, "L") if R_filepath is not None else None
-        r_arr = self.to_tensor(r) if r is not None else torch.zeros_like(g_arr)
+        r_arr = self.to_tensor(r) if r is not None else g_rr
 
         b = self.read_dcm(B_filepath, "L") if B_filepath is not None else None
-        b_arr = self.to_tensor(b) if b is not None else torch.zeros_like(g_arr)
+        b_arr = self.to_tensor(b) if b is not None else g_arr
 
         rgb = torch.cat([r_arr, g_arr, b_arr], dim=0)
         return self.to_pil(rgb)

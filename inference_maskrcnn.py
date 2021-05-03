@@ -195,6 +195,9 @@ def load_outputs_from_directory(outputs_dir, subj_sequences, classes):
 
             img = Image.open(filepath).convert("L")
             img_arr = np.array(img) / 255.
+
+            # if pred_class == "tongue":
+            #     img_arr[85:135, 0:75] = np.zeros((135 - 85, 75 - 0))
             # img_arr[img_arr < 0.1] = 0.
 
             out = {
