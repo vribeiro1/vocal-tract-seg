@@ -114,8 +114,8 @@ def main(_run, datadir, batch_size, n_epochs, patience, learning_rate,
     )
 
     augmentations = MultiCompose([
-        MultiRandomHorizontalFlip(),
-        MultiRandomVerticalFlip(),
+        # MultiRandomHorizontalFlip(),
+        # MultiRandomVerticalFlip(),
         MultiRandomRotation([-5, 5]),
     ])
 
