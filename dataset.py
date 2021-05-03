@@ -22,7 +22,7 @@ ROI = "roi"
 
 
 class VocalTractMaskRCNNDataset(Dataset):
-    def __init__(self, datadir, subj_sequences, classes, size=(224, 224), annotation=MASK, augmentations=None, mode="gray"):
+    def __init__(self, datadir, subj_sequences, classes, size=(224, 224), annotation=MASK, augmentations=None, mode="gray", allow_missing=False):
         if annotation not in (MASK, ROI):
             raise ValueError(f"Annotation level should be either '{MASK}' or '{ROI}'")
 
@@ -41,7 +41,7 @@ class VocalTractMaskRCNNDataset(Dataset):
 
             sequences.extend([(subj, seq) for seq in use_seqs])
 
-        self.data = self._collect_data(datadir, sequences, classes)
+        self.data = self._collect_data(datadir, sequences, classes, annotation, allow_missing=allow_missing)
         if len(self.data) == 0:
             raise Exception("Empty VocalTractMaskRCNNDataset")
 
@@ -61,7 +61,7 @@ class VocalTractMaskRCNNDataset(Dataset):
         self.augmentations = augmentations
 
     @staticmethod
-    def _collect_data(datadir, sequences, classes):
+    def _collect_data(datadir, sequences, classes, annotation, allow_missing=False):
         data = []
 
         for subject, sequence in sequences:
@@ -109,8 +109,18 @@ class VocalTractMaskRCNNDataset(Dataset):
                 }
 
                 is_none = lambda x: x[1] is None
-                if all(map(is_none, rois.items())) and all(map(is_none, targets.items())):
-                    # Skip if all annotations are None
+                if annotation == ROI:
+                    any_is_missing = any(map(is_none, rois.items()))
+                else:
+                    any_is_missing = any(map(is_none, targets.items()))
+                if not allow_missing and any_is_missing:
+                    continue
+
+                if annotation == ROI:
+                    all_is_missing = all(map(is_none, rois.items()))
+                else:
+                    all_is_missing = all(map(is_none, targets.items()))
+                if all_is_missing:
                     continue
 
                 data.append(item)
