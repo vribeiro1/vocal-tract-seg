@@ -193,8 +193,8 @@ def load_outputs_from_directory(outputs_dir, subj_sequences, classes):
             if pred_class not in classes:
                 continue
 
-            img = Image.open(filepath).convert("L")
-            img_arr = np.array(img) / 255.
+            # img = Image.open(filepath).convert("L")
+            # img_arr = np.array(img) / 255.
 
             # if pred_class == "tongue":
             #     img_arr[85:135, 0:75] = np.zeros((135 - 85, 75 - 0))
@@ -209,7 +209,8 @@ def load_outputs_from_directory(outputs_dir, subj_sequences, classes):
                 "label": None,
                 "pred_cls": pred_class,
                 "score": None,
-                "mask": img_arr
+                "mask_filepath": filepath,
+                "mask": None
             }
 
             outputs.append(out)
@@ -232,7 +233,12 @@ def process_out(out, save_to):
     if not os.path.exists(outputs_dir):
         os.makedirs(outputs_dir)
 
-    mask = out["mask"]
+    if "mask_filepath" in out:
+        mask = Image.open(filepath).convert("L")
+        mask = np.array(img) / 255.
+    else:
+        mask = out["mask"]
+
     contour = calculate_contour(pred_class, mask)
     if len(contour) > 0:
         contour = smooth_contour(contour)
