@@ -231,8 +231,8 @@ def process_out(out, save_to):
 
     if "mask_filepath" in out:
         mask_filepath = out["mask_filepath"]
-        mask = Image.open(mask_filepath).convert("L")
-        mask = np.array(img) / 255.
+        mask_img = Image.open(mask_filepath).convert("L")
+        mask = np.array(mask_img) / 255.
     else:
         mask = out["mask"]
 
