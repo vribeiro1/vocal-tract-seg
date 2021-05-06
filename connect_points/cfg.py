@@ -15,6 +15,7 @@ GRAPH_BASED = "graph-based"
 ACTIVE_CONTOURS = "active-contours"
 SKELETON = "skeletonize"
 BORDER_METHOD = "border-method"
+SKIMAGE = "skimage"
 
 PostProcessingCfg = namedtuple(
     "PostProcessingCfg",
@@ -32,13 +33,13 @@ PostProcessingCfg = namedtuple(
 # Post-processing configuration per class
 POST_PROCESSING = {
     ARYTENOID_MUSCLE: PostProcessingCfg(
-        method=BORDER_METHOD,
+        method=SKIMAGE,
         alpha=1,
         beta=1,
         gamma=0.05,
-        upscale=512,
+        upscale=256,
         max_upscale_iter=3,
-        threshold=0.3
+        threshold=0.7
     ),
 
     EPIGLOTTIS: PostProcessingCfg(
@@ -48,15 +49,15 @@ POST_PROCESSING = {
         gamma=0,
         upscale=256,
         max_upscale_iter=3,
-        threshold=0.1
+        threshold=0.3
     ),
 
     HYOID_BONE: PostProcessingCfg(
-        method=BORDER_METHOD,
+        method=SKIMAGE,
         alpha=1,
         beta=1,
         gamma=0.05,
-        upscale=512,
+        upscale=256,
         max_upscale_iter=3,
         threshold=0.6
     ),
@@ -80,6 +81,7 @@ POST_PROCESSING = {
         max_upscale_iter=3,
         threshold=0.5
     ),
+
     # SOFT_PALATE: PostProcessingCfg(
     #     method=ACTIVE_CONTOURS,
     #     alpha=1,
@@ -100,13 +102,13 @@ POST_PROCESSING = {
     ),
 
     THYROID_CARTILAGE: PostProcessingCfg(
-        method=BORDER_METHOD,
+        method=SKIMAGE,
         alpha=1,
         beta=1,
         gamma=0.05,
-        upscale=512,
+        upscale=256,
         max_upscale_iter=3,
-        threshold=0.3
+        threshold=0.8
     ),
 
     TONGUE: PostProcessingCfg(
@@ -138,13 +140,22 @@ POST_PROCESSING = {
         threshold=0.4
     ),
 
+    # VOCAL_FOLDS: PostProcessingCfg(
+    #     method=GRAPH_BASED,
+    #     alpha=1,
+    #     beta=10,
+    #     gamma=0,
+    #     upscale=256,
+    #     max_upscale_iter=3,
+    #     threshold=0.7
+    # ),
     VOCAL_FOLDS: PostProcessingCfg(
-        method=GRAPH_BASED,
+        method=SKIMAGE,
         alpha=1,
         beta=10,
         gamma=0,
         upscale=256,
         max_upscale_iter=3,
-        threshold=0.2
+        threshold=0.7
     ),
 }
