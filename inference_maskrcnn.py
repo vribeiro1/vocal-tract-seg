@@ -32,7 +32,7 @@ COLORS = {
 
 class InferenceVocalTractMaskRCNNDataset(VocalTractMaskRCNNDataset):
     @staticmethod
-    def _collect_data(datadir, sequences, classes):
+    def _collect_data(datadir, sequences, classes, annotation, allow_missing=False):
         data = []
 
         for subject, sequence in sequences:

@@ -4,7 +4,7 @@ import numpy as np
 
 from scipy.ndimage import binary_fill_holes
 from scipy.signal import convolve2d
-from skimage.measure import regionprops
+from skimage.measure import regionprops, find_contours
 from skimage.morphology import skeletonize
 
 from .active_contours import connect_with_active_contours, get_open_initial_curve, get_closed_initial_curve
@@ -24,6 +24,15 @@ def threshold_array(arr_, threshold, high=1., low=0.):
     arr[arr > threshold] = high
 
     return arr
+
+
+def contour_bbox_area(contour):
+    x0 = contour[:, 0].min()
+    y0 = contour[:, 1].min()
+    x1 = contour[:, 0].max()
+    y1 = contour[:, 1].max()
+
+    return (x1 - x0) * (y1 - y0)
 
 
 def calculate_contours_with_graph(mask, threshold, r, alpha, beta, gamma, articulator, **kwargs):
@@ -125,6 +134,14 @@ def calculate_contours_with_border_method(mask, threshold, **kwargs):
     return contour
 
 
+def calculate_contours_with_skimage(mask, threshold, **kwargs):
+    mask_thr = threshold_array(mask, threshold)
+    contours = sorted(find_contours(mask_thr), key=contour_bbox_area, reverse=True)
+    contour = np.flip(contours[0])
+
+    return contour
+
+
 def upscale_mask(mask_, upscale):
     mask = mask_.copy()
 
@@ -194,9 +211,9 @@ def calculate_contour(articulator, mask):
         if len(contour) > 10:
             break
 
-    contour = rescale_contour_fn(contour)
     if np.isnan(contour).any():
         raise Exception("contour has nan")
+    contour = rescale_contour_fn(contour)
 
     return contour
 
@@ -205,5 +222,6 @@ METHODS = {
     GRAPH_BASED: calculate_contours_with_graph,
     ACTIVE_CONTOURS: calculate_contours_with_active_contours,
     SKELETON: calculate_contours_with_skeleton,
-    BORDER_METHOD: calculate_contours_with_border_method
+    BORDER_METHOD: calculate_contours_with_border_method,
+    SKIMAGE: calculate_contours_with_skimage
 }
