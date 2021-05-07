@@ -136,7 +136,7 @@ def calculate_contours_with_border_method(mask, threshold, **kwargs):
 
 def calculate_contours_with_skimage(mask, threshold, **kwargs):
     mask_thr = threshold_array(mask, threshold)
-    contours = sorted(find_contours(mask_thr, 1.), key=contour_bbox_area, reverse=True)
+    contours = sorted(find_contours(mask_thr), key=contour_bbox_area, reverse=True)
 
     if len(contours) == 0:
         return []
