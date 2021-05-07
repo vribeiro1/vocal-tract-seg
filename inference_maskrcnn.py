@@ -267,16 +267,16 @@ def main(cfg):
 
     inference_directory = cfg.get("inference_dir")
 
-    model = maskrcnn_resnet50_fpn(pretrained=True)
-    if cfg["state_dict_fpath"] is not None:
-        state_dict = torch.load(cfg["state_dict_fpath"], map_location=device)
-        model.load_state_dict(state_dict)
-    model.to(device)
-
     if not os.path.exists(cfg["save_to"]):
         os.mkdir(cfg["save_to"])
 
     if inference_directory is None:
+        model = maskrcnn_resnet50_fpn(pretrained=True)
+        if cfg["state_dict_fpath"] is not None:
+            state_dict = torch.load(cfg["state_dict_fpath"], map_location=device)
+            model.load_state_dict(state_dict)
+        model.to(device)
+
         class_map = {i: c for c, i in dataset.classes_dict.items()}
         outputs = run_inference(
             model=model,
