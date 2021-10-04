@@ -4,6 +4,9 @@
 *.pyc
 *.ipynb
 *.out
+*.jpg
+*.png
+*.pdf
 
 .ipynb_checkpoints
 __pycache__
