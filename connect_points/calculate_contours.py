@@ -1,7 +1,10 @@
+import pdb
+
 import cv2
 import funcy
 import numpy as np
 
+from copy import deepcopy
 from scipy.ndimage import binary_fill_holes
 from scipy.signal import convolve2d
 from skimage.measure import regionprops, find_contours
@@ -35,7 +38,7 @@ def contour_bbox_area(contour):
     return (x1 - x0) * (y1 - y0)
 
 
-def calculate_contours_with_graph(mask, threshold, r, alpha, beta, gamma, articulator, **kwargs):
+def calculate_contours_with_graph(mask, threshold, r, alpha, beta, gamma, articulator, G, gravity_curve, **kwargs):
     mask_thr = threshold_array(mask, threshold)
 
     if articulator == SOFT_PALATE:
@@ -158,7 +161,7 @@ def upscale_mask(mask_, upscale):
     return mask, rescale_contour_fn
 
 
-def _calculate_contour_threshold_loop(post_processing_fn, mask, threshold, articulator, alpha, beta, gamma):
+def _calculate_contour_threshold_loop(post_processing_fn, mask, threshold, articulator, alpha, beta, gamma, G=0.0, gravity_curve=None):
     min_length = 10
     min_threshold = 0.00005
     contour = []
@@ -171,7 +174,9 @@ def _calculate_contour_threshold_loop(post_processing_fn, mask, threshold, artic
             r=3,
             alpha=alpha,
             beta=beta,
-            gamma=gamma
+            gamma=gamma,
+            G=G,
+            gravity_curve=gravity_curve
         )
 
         threshold = threshold * 0.9
@@ -181,7 +186,7 @@ def _calculate_contour_threshold_loop(post_processing_fn, mask, threshold, artic
     return contour
 
 
-def calculate_contour(articulator, mask):
+def calculate_contour(articulator, mask, gravity_curve=None):
     if articulator not in POST_PROCESSING:
         raise KeyError(
             f"Class '{articulator}' does not have post-processing parameters configured"
@@ -207,7 +212,9 @@ def calculate_contour(articulator, mask):
             articulator,
             post_proc.alpha,
             post_proc.beta,
-            post_proc.gamma
+            post_proc.gamma,
+            post_proc.G,
+            gravity_curve
         )
 
         if len(contour) > 10:
