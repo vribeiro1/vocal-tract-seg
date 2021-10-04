@@ -56,7 +56,12 @@ def calculate_contours_with_graph(mask, threshold, r, alpha, beta, gamma, articu
     if source is None or sink is None:
         return []
 
-    contour, _, _ = connect_points_graph_based(mask_thr, contour_points, r, alpha, beta, gamma, tails=(source, sink))
+    contour, _, _ = connect_points_graph_based(
+        mask_thr, contour_points, r, alpha, beta, gamma,
+        tails=(source, sink),
+        G=G,
+        gravity_curve=gravity_curve
+    )
 
     return contour
 

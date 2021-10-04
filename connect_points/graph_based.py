@@ -7,8 +7,15 @@ import numpy as np
 import statistics
 
 from collections import defaultdict
-from scipy.spatial.distance import euclidean
+from numba import jit
 from skimage.morphology import skeletonize
+
+
+@jit(nopython=True)
+def euclidean(u, v):
+    x_u, y_u = u
+    x_v, y_v = v
+    return np.sqrt((x_u - x_v) ** 2 + (y_u - y_v) ** 2)
 
 
 class Point:
@@ -19,10 +26,10 @@ class Point:
     # 4-th power of distance, because linear distance will force the algorithm
     # to connect points which are far from each other, skiping another points
     def weightTo(self, other):
-        return ((self.x - other.x)**2 + (self.y - other.y)**2)**2
+        return euclidean((self.x, self.y), (other.x, other.y)) ** 4
 
     def distanceTo(self, other):
-        return math.sqrt((self.x - other.x)**2 + (self.y - other.y)**2)
+        return euclidean((self.x, self.y), (other.x, other.y))
 
     def __lt__(self, other):
         return True
@@ -40,7 +47,7 @@ def pt_to_name(pt):
 def calc_min_dist(pt, contour):
     l2 = 10000000
     for pt_cont in contour:
-        l2_new = (pt.x - pt_cont[0])**2 + (pt.y - pt_cont[1])**2
+        l2_new = (pt.x - pt_cont[0]) ** 2 + (pt.y - pt_cont[1]) ** 2
         if l2_new < l2:
             l2 = l2_new
     return np.sqrt(l2)
@@ -131,8 +138,8 @@ def detect_extremities_on_axis(contour_points, axis=0):
     return pt1, pt2
 
 
-def gravity(G, m1, m2, r):
-    return G * (m1 * m2) / (r ** 2)
+def gravity(G, m1, m2, d):
+    return G * (m1 * m2) / (d ** 2)
 
 
 def construct_graph(contour, mask, r, alpha, beta, gamma, prev_contour=None, G=0.0, gravity_curve=None):
@@ -157,13 +164,13 @@ def construct_graph(contour, mask, r, alpha, beta, gamma, prev_contour=None, G=0
                     if gravity_curve is not None:
                         m1 = 1.
                         m2 = 1.
-                        r = min([euclidean((ix, iy), (x_g, y_g)) for x_g, y_g in gravity_curve])
-                        weight_gravity = gravity(G, m1, m2, r)
+                        d = min([euclidean((ix, iy), (x_g, y_g)) for x_g, y_g in gravity_curve])
+                        weight_gravity = gravity(G, m1, m2, d)
                     else:
                         weight_gravity = 0.0
 
-                    weight = alpha * pt.weightTo(Point(ix, iy)) + beta * (1 - P) + gamma * R + weight_gravity
-                    edges.append([pt_to_name((pt.x, pt.y)), pt_to_name((ix, iy)), weight])
+                    weight = alpha * pt.weightTo(Point(ix, iy)) + beta * (1 - P) + gamma * R - weight_gravity
+                    edges.append((pt_to_name((pt.x, pt.y)), pt_to_name((ix, iy)), weight))
     return edges
 
 

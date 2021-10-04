@@ -219,15 +219,13 @@ def smooth_contour(contour):
     return np.array([resX, resY]).transpose(1, 0)
 
 
-DATASET_DIR = "/home/vribeiro/Documents/loria/datasets/Gottingen_Database"
-
-def process_out(out, save_to):
+def process_out(out, datadir, save_to):
     subject = out["subject"]
     sequence = out["sequence"]
     instance_number = out["instance_number"]
     pred_class = out["pred_cls"]
 
-    outputs_dir = os.path.join(cfg["save_to"], "inference_contours", subject, sequence)
+    outputs_dir = os.path.join(save_to, "inference_contours", subject, sequence)
     if not os.path.exists(outputs_dir):
         os.makedirs(outputs_dir)
 
@@ -238,8 +236,18 @@ def process_out(out, save_to):
     else:
         mask = out["mask"]
 
-    gravity_curve_filepath = os.path.join(DATASET_DIR, subject, sequence, "inference_contours", f"{'%04d' % instance_number}_upper-incisor.npy")
-    gravity_curve = np.load(gravity_curve_filepath)
+    gravity_curve_filepath = os.path.join(
+        datadir,
+        subject,
+        sequence,
+        "inference_contours",
+        f"{'%04d' % instance_number}_upper-incisor.npy"
+    )
+
+    if os.path.isfile(gravity_curve_filepath):
+        gravity_curve = np.load(gravity_curve_filepath)
+    else:
+        gravity_curve = None
 
     contour = calculate_contour(pred_class, mask, gravity_curve=gravity_curve)
     if len(contour) > 0:
@@ -293,7 +301,7 @@ def main(cfg):
         outputs = load_outputs_from_directory(inference_directory, cfg["sequences"], cfg["classes"])
 
     for out in tqdm(outputs, desc="Calculating contours"):
-        process_out(out, cfg["save_to"])
+        process_out(out, cfg["datadir"], cfg["save_to"])
 
 
 if __name__ == "__main__":
