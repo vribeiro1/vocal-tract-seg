@@ -247,7 +247,6 @@ def process_out(out, save_to):
 
 def main(cfg):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    num_classes = len(cfg["classes"])
 
     dataset = InferenceVocalTractMaskRCNNDataset(
         cfg["datadir"],

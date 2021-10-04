@@ -42,24 +42,23 @@ def calculate_contours_with_graph(mask, threshold, r, alpha, beta, gamma, articu
         mask_thr = binary_fill_holes(mask_thr)
     mask_thr = skeletonize(mask_thr).astype(np.uint8)
 
-    contour, c = find_contour_points(mask_thr)
+    contour_points, c = find_contour_points(mask_thr)
     if articulator in (SOFT_PALATE, VOCAL_FOLDS):
-        source, sink = detect_extremities_on_axis(mask_thr, axis=0)
+        source, sink = detect_extremities_on_axis(contour_points, axis=0)
     elif articulator in (PHARYNX, EPIGLOTTIS):
-        source, sink = detect_extremities_on_axis(mask_thr, axis=1)
+        source, sink = detect_extremities_on_axis(contour_points, axis=1)
     else:
-        source, sink, _ = detect_tails(c, contour)
+        source, sink, _ = detect_tails(c, contour_points)
 
     if source is None or sink is None:
         return []
 
-    contour, _, _ = connect_points_graph_based(mask_thr, contour, r, alpha, beta, gamma, tails=(source, sink))
+    contour, _, _ = connect_points_graph_based(mask_thr, contour_points, r, alpha, beta, gamma, tails=(source, sink))
 
     return contour
 
 
 def calculate_contours_with_active_contours(mask, threshold, alpha, beta, gamma, articulator, **kwargs):
-    mask_ = mask.copy()
     mask_thr = threshold_array(mask, threshold).copy()
 
     if articulator in (UPPER_LIP, LOWER_LIP, TONGUE, SOFT_PALATE):

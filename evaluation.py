@@ -15,6 +15,21 @@ from dataset import VocalTractMaskRCNNDataset
 from metrics import evaluate_model
 from settings import *
 
+COLORS = {
+    "arytenoid-muscle": "blueviolet",
+    "epiglottis": "turquoise",
+    "hyoid-bone": "slategray",
+    "lower-incisor": "cyan",
+    "lower-lip": "lime",
+    "pharynx": "goldenrod",
+    "soft-palate": "dodgerblue",
+    "thyroid-cartilage": "saddlebrown",
+    "tongue": "darkorange",
+    "upper-incisor": "yellow",
+    "upper-lip": "magenta",
+    "vocal-folds": "hotpink"
+}
+
 
 def save_image_with_contour(img, filepath, contour, target=None):
     mask_contour = np.array(img)

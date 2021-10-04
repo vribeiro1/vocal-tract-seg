@@ -119,14 +119,13 @@ def detect_tails(point, otherPoints):
     return (pt1.x, pt1.y), (pt2.x, pt2.y), dist
 
 
-def detect_extremities_on_axis(mask_arr, axis=0):
-    y, x = np.where(skeletonize(mask_arr) == 1)
-    skeleton = list(zip(x, y))
-    if len(skeleton) == 0:
+def detect_extremities_on_axis(contour_points, axis=0):
+    if len(contour_points) == 0:
         return None, None
 
-    pt1 = min(skeleton, key=lambda p: p[axis])
-    pt2 = max(skeleton, key=lambda p: p[axis])
+    points = np.array([(p.x, p.y) for p in contour_points])
+    pt1 = min(points, key=lambda p: p[axis])
+    pt2 = max(points, key=lambda p: p[axis])
 
     return pt1, pt2
 

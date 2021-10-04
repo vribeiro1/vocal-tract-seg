@@ -101,7 +101,7 @@ def get_circle(p1, p2, p3):
     return (xc, yc), r
 
 
-def get_open_initial_curve(mask_arr, articulator, n_samples=100):
+def get_open_initial_curve(mask_arr, articulator, n_samples=50):
     ext1, ext2, ext3 = get_extremities(articulator, mask_arr)
     if any(funcy.lmap(lambda e: e is None, [ext1, ext2, ext3])):
         return
@@ -129,7 +129,7 @@ def get_open_initial_curve(mask_arr, articulator, n_samples=100):
     return init
 
 
-def get_closed_initial_curve(mask_arr, n_samples=100):
+def get_closed_initial_curve(mask_arr, n_samples=50):
     box = get_box_from_mask_tensor(mask_arr, margin=5)
     if box is None:
         return
@@ -147,7 +147,7 @@ def get_closed_initial_curve(mask_arr, n_samples=100):
     return init
 
 
-def connect_with_active_contours(mask_, init, alpha, beta, gamma, n_samples=400, max_iter=2500, boundary_condition="fixed"):
+def connect_with_active_contours(mask_, init, alpha, beta, gamma, max_iter=2500, boundary_condition="fixed"):
     mask = mask_.copy()
 
     snake = active_contour(
