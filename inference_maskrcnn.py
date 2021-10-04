@@ -219,6 +219,8 @@ def smooth_contour(contour):
     return np.array([resX, resY]).transpose(1, 0)
 
 
+DATASET_DIR = "/home/vribeiro/Documents/loria/datasets/Gottingen_Database"
+
 def process_out(out, save_to):
     subject = out["subject"]
     sequence = out["sequence"]
@@ -236,7 +238,10 @@ def process_out(out, save_to):
     else:
         mask = out["mask"]
 
-    contour = calculate_contour(pred_class, mask)
+    gravity_curve_filepath = os.path.join(DATASET_DIR, subject, sequence, "inference_contours", f"{'%04d' % instance_number}_upper-incisor.npy")
+    gravity_curve = np.load(gravity_curve_filepath)
+
+    contour = calculate_contour(pred_class, mask, gravity_curve=gravity_curve)
     if len(contour) > 0:
         contour = smooth_contour(contour)
 

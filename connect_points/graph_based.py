@@ -7,6 +7,7 @@ import numpy as np
 import statistics
 
 from collections import defaultdict
+from scipy.spatial.distance import euclidean
 from skimage.morphology import skeletonize
 
 
@@ -131,7 +132,11 @@ def detect_extremities_on_axis(mask_arr, axis=0):
     return pt1, pt2
 
 
-def construct_graph(contour, mask, r, alpha, beta, gamma, prev_contour=None):
+def gravity(G, m1, m2, r):
+    return G * (m1 * m2) / (r ** 2)
+
+
+def construct_graph(contour, mask, r, alpha, beta, gamma, prev_contour=None, G=0.0, gravity_curve=None):
     if prev_contour is None:
         prev_contour = []
 
@@ -149,7 +154,16 @@ def construct_graph(contour, mask, r, alpha, beta, gamma, prev_contour=None):
                     else:
                         R = calc_min_dist(Point(ix, iy), prev_contour)
                     otherPoints.append(Point(ix, iy))
-                    weight = alpha * pt.weightTo(Point(ix, iy)) + beta * (1 - P) + gamma * R
+
+                    if gravity_curve is not None:
+                        m1 = 1.
+                        m2 = 1.
+                        r = min([euclidean((ix, iy), (x_g, y_g)) for x_g, y_g in gravity_curve])
+                        weight_gravity = gravity(G, m1, m2, r)
+                    else:
+                        weight_gravity = 0.0
+
+                    weight = alpha * pt.weightTo(Point(ix, iy)) + beta * (1 - P) + gamma * R + weight_gravity
                     edges.append([pt_to_name((pt.x, pt.y)), pt_to_name((ix, iy)), weight])
     return edges
 
@@ -199,7 +213,7 @@ def find_contour_points(img, threshDistFactor=2):
     return contour, c
 
 
-def connect_points_graph_based(mask, contour, r, alpha, beta, gamma, tails, prev_contour=None):
+def connect_points_graph_based(mask, contour, r, alpha, beta, gamma, tails, prev_contour=None, G=0.0, gravity_curve=None):
     if prev_contour is None:
         prev_contour = []
 
@@ -208,7 +222,17 @@ def connect_points_graph_based(mask, contour, r, alpha, beta, gamma, tails, prev
 
     # Distance betweent the tails is decreased by 1, to not connect the
     # tails, but connect for sure all another points
-    edges = construct_graph(contour, mask, r - 1, alpha, beta, gamma, prev_contour=prev_contour)
+    edges = construct_graph(
+        contour,
+        mask,
+        r - 1,
+        alpha,
+        beta,
+        gamma,
+        prev_contour=prev_contour,
+        G=G,
+        gravity_curve=gravity_curve
+    )
 
     source, sink = tails
     names = shortest_path(edges, pt_to_name(source), pt_to_name(sink))

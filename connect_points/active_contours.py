@@ -109,21 +109,25 @@ def get_open_initial_curve(mask_arr, articulator, n_samples=100):
     (x_c, y_c), radius = get_circle(ext1, ext2, ext3)
 
     x1, y1 = ext1
-    sin1 = (y1 - y_c) / radius
     cos1 = (x1 - x_c) / radius
-    theta1 = np.arctan2(sin1, cos1)
+    sin1 = (y1 - y_c) / radius
+    theta1 = np.arctan(sin1 / cos1)
+    if theta1 < 0:
+        theta1 += np.pi
 
     x2, y2, = ext2
-    sin2 = (y2 - y_c) / radius
     cos2 = (x2 - x_c) / radius
-    theta2 = np.arctan2(sin2, cos2)
+    sin2 = (y2 - y_c) / radius
+    theta2 = np.arctan(sin2 / cos2)
+    if theta2 < 0:
+        theta2 += np.pi
 
     if articulator != "soft-palate":
         theta1 += 2 * np.pi
 
     s = np.linspace(theta2, theta1, n_samples)
-    r = y_c + radius * np.sin(s)
-    c = x_c + radius * np.cos(s)
+    r = x_c + radius * np.cos(s)
+    c = y_c + radius * np.sin(s)
     init = np.array([r, c]).T
 
     return init
