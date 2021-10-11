@@ -14,8 +14,7 @@ Université de Lorraine
 
 <br>
 
-<img src="static/img/8066_0009_6.gif">
-<img src="static/img/8066_0010_4.gif">
+<img src="static/img/8066_0009_6.gif"> <img src="static/img/8066_0010_4.gif">
 
 <br>
 <hr>
