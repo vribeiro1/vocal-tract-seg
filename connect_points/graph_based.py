@@ -1,6 +1,7 @@
 import pdb
 
 import cv2
+import funcy
 import heapq
 import math
 import numpy as np
@@ -27,20 +28,6 @@ def point_serialize(pt):
     return " ".join(map(str, pt))
 
 
-def calc_min_dist(pt, contour):
-    l2 = 1e7
-
-    x, y = pt
-    for pt_cont in contour:
-        x_cont, y_cont = pt_cont
-        l2_new = euclidean((x, y), (x_cont, y_cont)) ** 2
-
-        if l2_new < l2:
-            l2 = l2_new
-
-    return np.sqrt(l2)
-
-
 def uint16_to_uint8(image):
     max_val = np.amax(image)
     image = image.astype(float) * 255. / max_val
@@ -57,12 +44,13 @@ def shortest_path(edges, source, sink):
     # create a weighted DAG - {node:[(cost,neighbour), ...]}
     graph = defaultdict(list)
 
-    for l, r, c in edges:
-        graph[l].append((c,r))
+    for pt_left, pt_right, cost in edges:
+        graph[pt_left].append((cost, pt_right))
 
     # create a priority queue and hash set to store visited nodes
-    queue, visited = [(0, source, [])], set()
+    queue = [(0, source, [])]
     heapq.heapify(queue)
+    visited = set()
 
     # traverse graph with BFS
     while queue:
@@ -75,14 +63,14 @@ def shortest_path(edges, source, sink):
 
             # hit the sink
             if node == sink:
-                return (cost, path)
+                return cost, path
 
             # visit neighbours
             for c, neighbour in graph[node]:
                 if neighbour not in visited:
                     heapq.heappush(queue, (cost + c, neighbour, path))
 
-    return float("inf")
+    return np.inf, []
 
 
 # We take all the contour points around the center of mass, then we sort them and
@@ -92,25 +80,24 @@ def detect_tails(point, other_points):
     if len(other_points) == 0:
         return (), (), None
 
-    angles_and_points = []
-    for other_point in other_points:
-        x, y = point
-        other_x, other_y = other_point
+    x, y = point
+    angles_and_points = sorted([
+        (
+            math.atan2(other_y - y, other_x - x),
+            (other_x, other_y)
+        )
+        for other_x, other_y in other_points
+    ])
 
-        angle = math.atan2(other_y - y, other_x - x)
-        angles_and_points.append([angle, other_point])
-
-    angles_and_points.sort()
     max_gap = 0
-    for i in range(1, len(angles_and_points)):
-        angle, _ = angles_and_points[i]
-        angle_m1, _ = angles_and_points[i - 1]
+    for i, (angle, point) in enumerate(angles_and_points):
+        angle_m1, point_m1 = angles_and_points[i - 1]
         angle_distance = angle - angle_m1
 
         if angle_distance > max_gap:
             max_gap = angle_distance
-            _, pt1 = angles_and_points[i - 1]
-            _, pt2 = angles_and_points[i]
+            pt1 = point_m1
+            pt2 = point
 
     if len(angles_and_points) < 2:
         return other_points
@@ -118,7 +105,6 @@ def detect_tails(point, other_points):
     if max_gap == 0:
         _, pt1 = angles_and_points[0]
         _, pt2 = angles_and_points[1]
-
         dist = int(euclidean(pt1, pt2))
 
         return pt1, pt2, dist
@@ -127,7 +113,6 @@ def detect_tails(point, other_points):
     dist_first, _ = angles_and_points[0]
     if (2 * math.pi - dist_last + dist_first) > max_gap:
         max_gap = 2 * math.pi - dist_last + dist_first
-
         _, pt1 = angles_and_points[-1]
         _, pt2 = angles_and_points[0]
 
@@ -155,9 +140,6 @@ def detect_extremities_on_axis(contour_points, axis=0):
 
 
 def construct_graph(contour, mask, r, alpha, beta, gamma, prev_contour=None):
-    if prev_contour is None:
-        prev_contour = []
-
     edges = []
     for pt in contour:
         other_points = []
@@ -171,84 +153,57 @@ def construct_graph(contour, mask, r, alpha, beta, gamma, prev_contour=None):
                 mask_H, mask_W = mask.shape
                 if (
                     ix < 0 or
-                    iy < 0 or
                     ix > mask_W - 1 or
+                    iy < 0 or
                     iy > mask_H - 1
                 ):
                     continue
 
-                if mask[iy][ix]:
-                    P = mask[iy][ix]
-
-                    R = calc_min_dist((ix, iy), prev_contour) if prev_contour else 0
+                P = mask[iy][ix]
+                if P:
                     other_points.append((ix, iy))
 
                     weight_to = euclidean((x, y), (ix, iy)) ** 4
-                    weight = alpha * weight_to + beta * (1 - P) + gamma * R
+                    weight_intensity = 1 - P
+                    distance_to_point = lambda other_pt: euclidean((ix, iy), other_pt)
+                    weight_prev_contour = min(map(distance_to_point, prev_contour)) if prev_contour else 0
+
+                    weight = alpha * weight_to + beta * weight_intensity + gamma * weight_prev_contour
                     edges.append((point_serialize((x, y)), point_serialize((ix, iy)), weight))
 
     return edges
 
 
-def find_contour_points(img, threshold_dist_factor=2):
+def find_contour_points(img, thr_dist_factor=2.):
     locations = cv2.findNonZero(img)
     if locations is None:
         return [], ()
 
     # Construct a list with all points
-    points = []
-    for location in locations:
-        x = location[0][0]
-        y = location[0][1]
-        points.append((x, y))
+    points = np.squeeze(locations, axis=1)
 
     # Center of mass
-    cm_x = 0
-    cm_y = 0
-    for pt in points:
-        x, y = pt
-        cm_x += x
-        cm_y += y
-
-    cm_x /= len(points)
-    cm_y /= len(points)
+    cm_x, cm_y = points.sum(axis=0) / len(points)
+    cm = cm_x, cm_y
 
     # Calculate all distances to the center of the mass and their median
-    dist = []
-    for pt in points:
-        x, y = pt
-        dist_to_CM = euclidean((x, y), (cm_x, cm_y))
-        dist.append(dist_to_CM)
-    median_dist = statistics.median(dist)
+    distances_to_CM = funcy.lmap(lambda pt: euclidean(pt, cm), points)
+    median_dist = statistics.median(distances_to_CM)
 
     # If the point is not farther than the threshold, count that this is not an outlier
-    contour = []
-    for pt in points:
-        x, y = pt
-        dist_to_CM = euclidean((x, y), (cm_x, cm_y))
-
-        if dist_to_CM < threshold_dist_factor * median_dist:
-            contour.append(pt)
+    contour = np.array([
+        pt for pt, dist in zip(points, distances_to_CM)
+        if dist < thr_dist_factor * median_dist
+    ])
 
     # Center of mass
-    cm_x = 0
-    cm_y = 0
-    for pt in contour:
-        x, y = pt
-        cm_x += x
-        cm_y += y
-
-    cm_x /= len(points)
-    cm_y /= len(points)
+    cm_x, cm_y = contour.sum(axis=0) / len(points)
     cm = cm_x, cm_y
 
     return contour, cm
 
 
 def connect_points_graph_based(mask, contour, r, alpha, beta, gamma, tails, prev_contour=None):
-    if prev_contour is None:
-        prev_contour = []
-
     if len(contour) == 0:
         return [], (), ()
 
@@ -256,15 +211,11 @@ def connect_points_graph_based(mask, contour, r, alpha, beta, gamma, tails, prev
     # tails, but connect for sure all another points
     edges = construct_graph(contour, mask, r - 1, alpha, beta, gamma, prev_contour=prev_contour)
 
-    source, sink = tails
-    names = shortest_path(edges, point_serialize(source), point_serialize(sink))
-    if type(names) is float:
-        return [], (), ()
+    source, sink = map(point_serialize, tails)
+    cost, path = shortest_path(edges, source, sink)
+    path = funcy.lmap(point_deserialize, path)
 
-    names = names[1]
-    path = []
-    for name in names:
-        pt = point_deserialize(name)
-        path.append(pt)
+    if cost == np.inf:
+        return [], (), ()
 
     return np.array(path), source, sink

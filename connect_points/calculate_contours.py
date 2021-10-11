@@ -7,10 +7,22 @@ from scipy.signal import convolve2d
 from skimage.measure import regionprops, find_contours
 from skimage.morphology import skeletonize
 
-from .active_contours import connect_with_active_contours, get_open_initial_curve, get_closed_initial_curve
+from .active_contours import (
+    connect_with_active_contours,
+    get_open_initial_curve,
+    get_closed_initial_curve
+)
 from .cfg import *
-from .graph_based import connect_points_graph_based, detect_tails, detect_extremities_on_axis, find_contour_points
-from .skeleton import connect_with_skeleton, skeleton_sort
+from .graph_based import (
+    connect_points_graph_based,
+    detect_tails,
+    detect_extremities_on_axis,
+    find_contour_points
+)
+from .skeleton import (
+    connect_with_skeleton,
+    skeleton_sort
+)
 
 
 def rescale_contour(contour, s_in, s_out):
@@ -39,11 +51,9 @@ def calculate_contours_with_graph(mask, threshold, r, alpha, beta, gamma, articu
     mask_thr = threshold_array(mask, threshold)
 
     if articulator == SOFT_PALATE:
-        mask_thr = threshold_array(mask, threshold)
         mask_thr = binary_fill_holes(mask_thr)
 
-    if articulator != TONGUE:
-        mask_thr = skeletonize(mask_thr).astype(np.uint8)
+    mask_thr = skeletonize(mask_thr).astype(np.uint8)
 
     contour_points, c = find_contour_points(mask_thr)
     if articulator in (SOFT_PALATE, VOCAL_FOLDS):
