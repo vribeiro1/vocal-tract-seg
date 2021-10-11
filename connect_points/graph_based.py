@@ -7,41 +7,37 @@ import numpy as np
 import statistics
 
 from collections import defaultdict
-from skimage.morphology import skeletonize
+from numba import jit
 
 
-class Point:
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
+@jit(nopython=True)
+def euclidean(u, v):
+    x_u, y_u = u
+    x_v, y_v = v
 
-    # 4-th power of distance, because linear distance will force the algorithm
-    # to connect points which are far from each other, skiping another points
-    def weightTo(self, other):
-        return ((self.x - other.x)**2 + (self.y - other.y)**2)**2
-
-    def distanceTo(self, other):
-        return math.sqrt((self.x - other.x)**2 + (self.y - other.y)**2)
-
-    def __lt__(self, other):
-        return True
+    return np.sqrt((x_u - x_v) ** 2 + (y_u - y_v) ** 2)
 
 
-def name_to_pt(name):
-    coordList = name.split()
-    return (int(coordList[0]), int(coordList[1]))
+def point_deserialize(pt_str):
+    x, y = pt_str.split()
+    return int(x), int(y)
 
 
-def pt_to_name(pt):
-    return (str(pt[0]) + " " + str(pt[1]))
+def point_serialize(pt):
+    return " ".join(map(str, pt))
 
 
 def calc_min_dist(pt, contour):
-    l2 = 10000000
+    l2 = 1e7
+
+    x, y = pt
     for pt_cont in contour:
-        l2_new = (pt.x - pt_cont[0])**2 + (pt.y - pt_cont[1])**2
+        x_cont, y_cont = pt_cont
+        l2_new = euclidean((x, y), (x_cont, y_cont)) ** 2
+
         if l2_new < l2:
             l2 = l2_new
+
     return np.sqrt(l2)
 
 
@@ -60,70 +56,98 @@ def shortest_path(edges, source, sink):
     """
     # create a weighted DAG - {node:[(cost,neighbour), ...]}
     graph = defaultdict(list)
+
     for l, r, c in edges:
         graph[l].append((c,r))
+
     # create a priority queue and hash set to store visited nodes
     queue, visited = [(0, source, [])], set()
     heapq.heapify(queue)
+
     # traverse graph with BFS
     while queue:
         (cost, node, path) = heapq.heappop(queue)
+
         # visit the node if it was not visited before
         if node not in visited:
             visited.add(node)
             path = path + [node]
+
             # hit the sink
             if node == sink:
                 return (cost, path)
+
             # visit neighbours
             for c, neighbour in graph[node]:
                 if neighbour not in visited:
-                    heapq.heappush(queue, (cost+c, neighbour, path))
+                    heapq.heappush(queue, (cost + c, neighbour, path))
+
     return float("inf")
 
 
 # We take all the contour points around the center of mass, then we sort them and
 # detect a maximal gap. We think that the points separated by this gap are the tails,
 # but it can be not the case in many cases. Pay attention.
-def detect_tails(point, otherPoints):
-    if len(otherPoints) == 0:
+def detect_tails(point, other_points):
+    if len(other_points) == 0:
         return (), (), None
 
-    anglesAndPoints = []
-    for otherPoint in otherPoints:
-        angle = math.atan2(otherPoint.y - point.y, otherPoint.x - point.x)
-        anglesAndPoints.append([angle, otherPoint])
+    angles_and_points = []
+    for other_point in other_points:
+        x, y = point
+        other_x, other_y = other_point
 
-    anglesAndPoints.sort()
-    maxGap = 0
-    for i in range(1, len(anglesAndPoints)):
-        angleDistance = anglesAndPoints[i][0] - anglesAndPoints[i - 1][0]
-        if angleDistance > maxGap:
-            maxGap = angleDistance
-            pt1 = anglesAndPoints[i - 1][1]
-            pt2 = anglesAndPoints[i][1]
+        angle = math.atan2(other_y - y, other_x - x)
+        angles_and_points.append([angle, other_point])
 
-    if len(anglesAndPoints) < 2:
-      return otherPoints
+    angles_and_points.sort()
+    max_gap = 0
+    for i in range(1, len(angles_and_points)):
+        angle, _ = angles_and_points[i]
+        angle_m1, _ = angles_and_points[i - 1]
+        angle_distance = angle - angle_m1
 
-    if maxGap == 0:
-       return [anglesAndPoints[0][1], anglesAndPoints[1][1]]
+        if angle_distance > max_gap:
+            max_gap = angle_distance
+            _, pt1 = angles_and_points[i - 1]
+            _, pt2 = angles_and_points[i]
 
-    if (2 * math.pi - anglesAndPoints[-1][0] + anglesAndPoints[0][0]) > maxGap:
-       maxGap = 2 * math.pi - anglesAndPoints[-1][0] + anglesAndPoints[0][0]
-       pt1 = anglesAndPoints[-1][1]
-       pt2 = anglesAndPoints[0][1]
+    if len(angles_and_points) < 2:
+        return other_points
 
-    dist = int(pt1.distanceTo(pt2))
+    if max_gap == 0:
+        _, pt1 = angles_and_points[0]
+        _, pt2 = angles_and_points[1]
 
-    return (pt1.x, pt1.y), (pt2.x, pt2.y), dist
+        dist = int(euclidean(pt1, pt2))
+
+        return pt1, pt2, dist
+
+    dist_last, _ = angles_and_points[-1]
+    dist_first, _ = angles_and_points[0]
+    if (2 * math.pi - dist_last + dist_first) > max_gap:
+        max_gap = 2 * math.pi - dist_last + dist_first
+
+        _, pt1 = angles_and_points[-1]
+        _, pt2 = angles_and_points[0]
+
+    dist = int(euclidean(pt1, pt2))
+
+    return pt1, pt2, dist
 
 
 def detect_extremities_on_axis(contour_points, axis=0):
+    """
+    Detect the extremities of the contour probability map in a given axis.
+
+    Args:
+    contour_points (List[Tuple[int, int]]): List of points that belong to the contour.
+    axis (int): 0 for the x-axis, 1 for the y-axis.
+    """
     if len(contour_points) == 0:
         return None, None
 
-    points = np.array([(p.x, p.y) for p in contour_points])
+    points = np.array(contour_points)
     pt1 = min(points, key=lambda p: p[axis])
     pt2 = max(points, key=lambda p: p[axis])
 
@@ -136,66 +160,89 @@ def construct_graph(contour, mask, r, alpha, beta, gamma, prev_contour=None):
 
     edges = []
     for pt in contour:
-        otherPoints = []
-        for ix in range(pt.x - r, pt.x + r):
-            for iy in range(pt.y - r, pt.y + r):
-                if (ix < 0 or iy < 0 or ix > mask.shape[1] - 1 or iy > mask.shape[0] - 1 or (ix == pt.x and iy == pt.y)):
+        other_points = []
+
+        x, y = pt
+        for ix in range(x - r, x + r):
+            for iy in range(y - r, y + r):
+                if ix == x and iy == y:
                     continue
+
+                mask_H, mask_W = mask.shape
+                if (
+                    ix < 0 or
+                    iy < 0 or
+                    ix > mask_W - 1 or
+                    iy > mask_H - 1
+                ):
+                    continue
+
                 if mask[iy][ix]:
                     P = mask[iy][ix]
-                    if prev_contour == []:
-                        R = 0
-                    else:
-                        R = calc_min_dist(Point(ix, iy), prev_contour)
-                    otherPoints.append(Point(ix, iy))
-                    weight = alpha * pt.weightTo(Point(ix, iy)) + beta * (1 - P) + gamma * R
-                    edges.append([pt_to_name((pt.x, pt.y)), pt_to_name((ix, iy)), weight])
+
+                    R = calc_min_dist((ix, iy), prev_contour) if prev_contour else 0
+                    other_points.append((ix, iy))
+
+                    weight_to = euclidean((x, y), (ix, iy)) ** 4
+                    weight = alpha * weight_to + beta * (1 - P) + gamma * R
+                    edges.append((point_serialize((x, y)), point_serialize((ix, iy)), weight))
+
     return edges
 
 
-def find_contour_points(img, threshDistFactor=2):
+def find_contour_points(img, threshold_dist_factor=2):
     locations = cv2.findNonZero(img)
     if locations is None:
-        return [], []
+        return [], ()
 
     # Construct a list with all points
     points = []
-    for i in range(0, locations.shape[0]):
-        points.append(Point(locations[i][0][0], locations[i][0][1]))
-    # Center of the mass
-    cx = 0
-    cy = 0
+    for location in locations:
+        x = location[0][0]
+        y = location[0][1]
+        points.append((x, y))
+
+    # Center of mass
+    cm_x = 0
+    cm_y = 0
     for pt in points:
-        cx += pt.x
-        cy += pt.y
-    cx /= len(points)
-    cy /= len(points)
-    c = Point(cx, cy)
+        x, y = pt
+        cm_x += x
+        cm_y += y
+
+    cm_x /= len(points)
+    cm_y /= len(points)
 
     # Calculate all distances to the center of the mass and their median
     dist = []
     for pt in points:
-        dist.append(pt.distanceTo(c))
-    medDist = statistics.median(dist)
+        x, y = pt
+        dist_to_CM = euclidean((x, y), (cm_x, cm_y))
+        dist.append(dist_to_CM)
+    median_dist = statistics.median(dist)
 
-    # If the point is not farther than the threshold, count that this is not
-    # an outlier
+    # If the point is not farther than the threshold, count that this is not an outlier
     contour = []
     for pt in points:
-        if pt.distanceTo(c) < threshDistFactor * medDist:
+        x, y = pt
+        dist_to_CM = euclidean((x, y), (cm_x, cm_y))
+
+        if dist_to_CM < threshold_dist_factor * median_dist:
             contour.append(pt)
 
-    # Center of the mass
-    cx = 0
-    cy = 0
+    # Center of mass
+    cm_x = 0
+    cm_y = 0
     for pt in contour:
-        cx += pt.x
-        cy += pt.y
-    cx /= len(points)
-    cy /= len(points)
-    c = Point(cx, cy)
+        x, y = pt
+        cm_x += x
+        cm_y += y
 
-    return contour, c
+    cm_x /= len(points)
+    cm_y /= len(points)
+    cm = cm_x, cm_y
+
+    return contour, cm
 
 
 def connect_points_graph_based(mask, contour, r, alpha, beta, gamma, tails, prev_contour=None):
@@ -210,14 +257,14 @@ def connect_points_graph_based(mask, contour, r, alpha, beta, gamma, tails, prev
     edges = construct_graph(contour, mask, r - 1, alpha, beta, gamma, prev_contour=prev_contour)
 
     source, sink = tails
-    names = shortest_path(edges, pt_to_name(source), pt_to_name(sink))
+    names = shortest_path(edges, point_serialize(source), point_serialize(sink))
     if type(names) is float:
-        return [], [], []
+        return [], (), ()
 
     names = names[1]
     path = []
     for name in names:
-        pt = name_to_pt(name)
+        pt = point_deserialize(name)
         path.append(pt)
 
     return np.array(path), source, sink

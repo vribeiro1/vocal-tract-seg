@@ -39,8 +39,11 @@ def calculate_contours_with_graph(mask, threshold, r, alpha, beta, gamma, articu
     mask_thr = threshold_array(mask, threshold)
 
     if articulator == SOFT_PALATE:
+        mask_thr = threshold_array(mask, threshold)
         mask_thr = binary_fill_holes(mask_thr)
-    mask_thr = skeletonize(mask_thr).astype(np.uint8)
+
+    if articulator != TONGUE:
+        mask_thr = skeletonize(mask_thr).astype(np.uint8)
 
     contour_points, c = find_contour_points(mask_thr)
     if articulator in (SOFT_PALATE, VOCAL_FOLDS):
