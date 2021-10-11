@@ -5,7 +5,6 @@ import funcy
 import heapq
 import math
 import numpy as np
-import statistics
 
 from collections import defaultdict
 from numba import jit
@@ -188,7 +187,7 @@ def find_contour_points(img, thr_dist_factor=2.):
 
     # Calculate all distances to the center of the mass and their median
     distances_to_CM = funcy.lmap(lambda pt: euclidean(pt, cm), points)
-    median_dist = statistics.median(distances_to_CM)
+    median_dist = np.median(distances_to_CM)
 
     # If the point is not farther than the threshold, count that this is not an outlier
     contour = np.array([
