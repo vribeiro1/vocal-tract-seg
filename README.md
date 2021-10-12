@@ -5,8 +5,7 @@ LORIA - Laboratoire Lorrain de Recherche en Informatique et ses Applications<br>
 Université de Lorraine
 
 <b>Contact me:</b><br>
-<b>E-mail:</b> vinicius.ribeiro1@gmail.com<br>
-<b>LinkedIn:</b> https://www.linkedin.com/in/vribeiro1/<br>
+<b>E-mail:</b> vinicius.souza-ribeiro@loria.com<br>
 <b>Web:</b> https://vribeiro1.github.io<br>
 
 <hr>
@@ -15,9 +14,7 @@ Université de Lorraine
 
 <br>
 
-<img src="static/img/1612_S7_200_to_500.gif">
-&nbsp;
-<img src="static/img/1617_S15_900_to_1200.gif">
+<img src="static/img/8066_0009_6.gif"> <img src="static/img/8066_0010_4.gif">
 
 <br>
 <hr>

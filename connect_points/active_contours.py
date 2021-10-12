@@ -29,7 +29,7 @@ def get_general_extremities(mask_arr):
     if box is None:
         return None, None, None
 
-    x0, y0, x1, y1 = box
+    x0, y0, _, _ = box
     ext3 = (x0, y0)
 
     return ext1, ext2, ext3
