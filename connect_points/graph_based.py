@@ -139,14 +139,94 @@ def detect_extremities_on_axis(contour_points, axis=0):
 
 
 def gravity(G, m1, m2, d):
-    return G * (m1 * m2) / (d ** 2)
+    eps = 1e-3
+    return -(m1 * m2) / ((d + eps) ** 4)
 
 
-def construct_graph(contour, mask, r, alpha, beta, gamma, prev_contour=None, G=0.0, gravity_curve=None):
-    if prev_contour is None:
-        prev_contour = []
+def calculate_edge_weights(
+    curr_pt, other_pt, center_of_mass, other_pt_prob, alpha, beta, gamma, delta, G,
+    prev_contour=None, gravity_curve=None
+):
+    """
+    Calculates the weight for each edge in the graph. The edges' weights have five components,
+    which are:
+    1) The squared distance between the current and the next points;
+    2) The probability of the next point;
+    3) The minimal distance between the previous frame contour (if provided) and the next point;
+    4) The angle between the current point and the next point to avoid the algorithm following the
+    backwards direction.
+    5) The distance between a reference curve (gravity_curve) and the next point;
 
+    Args:
+    curr_pt (Tuple[int, int]): Current node in the graph.
+    other_pt (Tuple[int, int]): Next node in the graph.
+    center_of_mass (Tuple[int, int]): Center of mass of the graph.
+    other_pt_prob (float): Probability of the next node.
+    alpha (float): Weight of the (1) component.
+    beta (float): Weight of the (2) component.
+    gamma (float): Weight of the (3) component.
+    delta (float): Weight of the (4) component.
+    G (float): Weight of the (5) component.
+    prev_contour (List): Contour of the previous frame.
+    gravity_curve (np.ndarray): Contour of the reference curve of the gravity algorithm.
+    """
+    x, y = curr_pt
+    ix, iy = other_pt
+    cm_x, cm_y = center_of_mass
+
+
+    weight_to = euclidean((x, y), (ix, iy)) ** 2
+    weight_intensity = 1 - other_pt_prob
+
+    # If the contour of the previous frame is provided, this weight penalizes the
+    # algorithm for finding curves that are too distant from the previous, avoiding
+    # big jumps.
+    distance_to_point = lambda other_pt: euclidean((ix, iy), other_pt)
+    weight_prev_contour = min(
+        map(distance_to_point, prev_contour)
+    ) if prev_contour else 0
+
+    # We want to follow a proper direction in the search for the contour.
+    # Thus, we penalize the algorithm for going backwards.
+    angle_curr_rad = math.atan2(y - cm_y, x - cm_x) - (np.pi / 2)
+    if angle_curr_rad < 0:
+        angle_curr_rad = 2 * np.pi - angle_curr_rad
+
+    angle_other_rad = math.atan2(iy - cm_y, x - cm_x) - (np.pi / 2)
+    if angle_other_rad < 0:
+        angle_other_rad = 2 * np.pi - angle_other_rad
+
+    weight_angle = int(angle_other_rad < angle_curr_rad)
+
+    # Gravity weight penalizes the algorithm for selecting points farther from the
+    # reference curve, which is useful for adjusting the contact between the tongue
+    # and the alveolar region.
+    if gravity_curve is not None:
+        m1 = m2 = 1.
+        d = min([euclidean((ix, iy), (x_g, y_g)) for x_g, y_g in gravity_curve])
+        weight_gravity = gravity(G, m1, m2, d)
+    else:
+        weight_gravity = 0.0
+
+    weight = (
+        alpha * weight_to +
+        beta * weight_intensity +
+        gamma * weight_prev_contour +
+        delta * weight_angle +
+        G * weight_gravity
+    )
+    return weight
+
+
+def construct_graph(
+    contour, mask, r, alpha, beta, gamma, delta,
+    prev_contour=None, G=0.0, gravity_curve=None
+):
     edges = []
+
+    # Center of mass
+    cm_x, cm_y = contour.sum(axis=0) / len(contour)
+
     for pt in contour:
         other_points = []
 
@@ -169,20 +249,11 @@ def construct_graph(contour, mask, r, alpha, beta, gamma, prev_contour=None, G=0
                 if P:
                     other_points.append((ix, iy))
 
-                    weight_to = euclidean((x, y), (ix, iy)) ** 4
-                    weight_intensity = 1 - P
-                    distance_to_point = lambda other_pt: euclidean((ix, iy), other_pt)
-                    weight_prev_contour = min(map(distance_to_point, prev_contour)) if prev_contour else 0
-
-                    if gravity_curve is not None:
-                        m1 = 1.
-                        m2 = 1.
-                        d = min([euclidean((ix, iy), (x_g, y_g)) for x_g, y_g in gravity_curve])
-                        weight_gravity = gravity(G, m1, m2, d)
-                    else:
-                        weight_gravity = 0.0
-
-                    weight = alpha * weight_to + beta * weight_intensity + gamma * weight_prev_contour - weight_gravity
+                    weight = calculate_edge_weights(
+                        (x, y), (ix, iy), (cm_x, cm_y), P,
+                        alpha, beta, gamma, delta, G,
+                        prev_contour, gravity_curve
+                    )
                     edges.append((point_serialize((x, y)), point_serialize((ix, iy)), weight))
 
     return edges
@@ -217,7 +288,10 @@ def find_contour_points(img, thr_dist_factor=2.):
     return contour, cm
 
 
-def connect_points_graph_based(mask, contour, r, alpha, beta, gamma, tails, prev_contour=None, G=0.0, gravity_curve=None):
+def connect_points_graph_based(
+    mask, contour, r, alpha, beta, gamma, delta, tails,
+    prev_contour=None, G=0.0, gravity_curve=None
+):
     if prev_contour is None:
         prev_contour = []
 
@@ -230,6 +304,7 @@ def connect_points_graph_based(mask, contour, r, alpha, beta, gamma, tails, prev
         alpha,
         beta,
         gamma,
+        delta,
         prev_contour=prev_contour,
         G=G,
         gravity_curve=gravity_curve
