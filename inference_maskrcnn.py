@@ -219,6 +219,21 @@ def smooth_contour(contour):
     return np.array([resX, resY]).transpose(1, 0)
 
 
+def load_articulator_array(filepath):
+    """
+    Loads the target array with the proper orientation (right to left)
+    """
+
+    target_array = np.load(filepath)
+
+    # All the countors should be oriented from right to left. If it is the opposite,
+    # we flip the array.
+    if target_array[0][0] < target_array[-1][0]:
+        target_array = np.flip(target_array, axis=0)
+
+    return target_array.copy()
+
+
 def process_out(out, datadir, save_to):
     subject = out["subject"]
     sequence = out["sequence"]
@@ -245,7 +260,7 @@ def process_out(out, datadir, save_to):
     )
 
     if os.path.isfile(gravity_curve_filepath):
-        gravity_curve = np.load(gravity_curve_filepath)
+        gravity_curve = load_articulator_array(gravity_curve_filepath)[:-10]
     else:
         gravity_curve = None
 

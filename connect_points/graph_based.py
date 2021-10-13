@@ -200,12 +200,17 @@ def calculate_edge_weights(
     # Gravity weight penalizes the algorithm for selecting points farther from the
     # reference curve, which is useful for adjusting the contact between the tongue
     # and the alveolar region.
+    weight_gravity = 0.0
     if gravity_curve is not None:
-        m1 = m2 = 1.
-        d = min([euclidean((ix, iy), (x_g, y_g)) for x_g, y_g in gravity_curve])
-        weight_gravity = gravity(G, m1, m2, d)
-    else:
-        weight_gravity = 0.0
+        min_xg, min_yg = gravity_curve.min(axis=0)
+        max_xg, max_yg = gravity_curve.max(axis=0)
+
+        # To reduce the number of evaluated points, exclude points that are not in the region of
+        # the gravity curve since their weights would be close to zero anyway.
+        if (min_xg - 5) < ix < (max_xg + 5) and min_yg < iy < (max_yg + 5):
+            m1 = m2 = 1.
+            d = min([euclidean((ix, iy), (x_g, y_g)) for x_g, y_g in gravity_curve])
+            weight_gravity = gravity(G, m1, m2, d)
 
     weight = (
         alpha * weight_to +

@@ -135,8 +135,8 @@ POST_PROCESSING = {
         beta=100,
         gamma=0,
         delta=2500,
-        upscale=256,
-        max_upscale_iter=3,
+        upscale=136,
+        max_upscale_iter=4,
         threshold=0.2,
         G=500
     ),

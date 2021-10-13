@@ -1,3 +1,4 @@
+from math import sin
 import pdb
 
 import cv2
@@ -190,7 +191,7 @@ def upscale_mask(mask_, upscale):
 
 
 def _calculate_contour_threshold_loop(
-    post_processing_fn, mask, threshold, articulator, alpha, beta, gamma,
+    post_processing_fn, mask, threshold, articulator, alpha, beta, gamma, delta,
     G=0.0, gravity_curve=None
 ):
     min_length = 10
@@ -206,6 +207,7 @@ def _calculate_contour_threshold_loop(
             alpha=alpha,
             beta=beta,
             gamma=gamma,
+            delta=delta,
             G=G,
             gravity_curve=gravity_curve
         )
@@ -235,6 +237,11 @@ def calculate_contour(articulator, mask, gravity_curve=None):
         # generated contour. Else, we use an identity function as a placeholder.
         new_mask, rescale_contour_fn = upscale_mask(mask, upscale)
 
+        rescaled_gravity_curve = None
+        if gravity_curve is not None:
+            s_in, _ = mask.shape
+            rescaled_gravity_curve = rescale_contour(gravity_curve, s_in=s_in, s_out=upscale)
+
         post_processing_fn = METHODS[post_proc.method]
         contour = _calculate_contour_threshold_loop(
             post_processing_fn,
@@ -244,8 +251,9 @@ def calculate_contour(articulator, mask, gravity_curve=None):
             post_proc.alpha,
             post_proc.beta,
             post_proc.gamma,
+            post_proc.delta,
             post_proc.G,
-            gravity_curve
+            rescaled_gravity_curve
         )
 
         if len(contour) > 10:
