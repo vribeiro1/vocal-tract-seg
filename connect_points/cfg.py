@@ -24,6 +24,7 @@ PostProcessingCfg = namedtuple(
         "alpha",
         "beta",
         "gamma",
+        "delta",
         "upscale",
         "max_upscale_iter",
         "threshold",

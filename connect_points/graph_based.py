@@ -174,7 +174,6 @@ def calculate_edge_weights(
     ix, iy = other_pt
     cm_x, cm_y = center_of_mass
 
-
     weight_to = euclidean((x, y), (ix, iy)) ** 2
     weight_intensity = 1 - other_pt_prob
 
