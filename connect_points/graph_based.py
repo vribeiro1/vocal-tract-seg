@@ -138,7 +138,7 @@ def detect_extremities_on_axis(contour_points, axis=0):
     return pt1, pt2
 
 
-def gravity(G, m1, m2, d):
+def gravity(m1, m2, d):
     eps = 1e-3
     return -(m1 * m2) / ((d + eps) ** 4)
 
@@ -210,7 +210,7 @@ def calculate_edge_weights(
         if (min_xg - 5) < ix < (max_xg + 5) and min_yg < iy < (max_yg + 5):
             m1 = m2 = 1.
             d = min([euclidean((ix, iy), (x_g, y_g)) for x_g, y_g in gravity_curve])
-            weight_gravity = gravity(G, m1, m2, d)
+            weight_gravity = gravity(m1, m2, d)
 
     weight = (
         alpha * weight_to +

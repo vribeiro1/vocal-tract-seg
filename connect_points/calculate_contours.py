@@ -1,11 +1,9 @@
-from math import sin
 import pdb
 
 import cv2
 import funcy
 import numpy as np
 
-from copy import deepcopy
 from scipy.ndimage import binary_fill_holes
 from scipy.signal import convolve2d
 from skimage.measure import regionprops, find_contours
@@ -212,7 +210,7 @@ def _calculate_contour_threshold_loop(
             gravity_curve=gravity_curve
         )
 
-        threshold = threshold * 0.9
+        threshold = threshold * 0.8
         if threshold < min_threshold:
             break
 
