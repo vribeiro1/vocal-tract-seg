@@ -285,6 +285,9 @@ def find_contour_points(img, thr_dist_factor=2.):
         if dist < thr_dist_factor * median_dist
     ])
 
+    if len(contour) == 0:
+        return [], ()
+
     # Center of mass
     cm_x, cm_y = contour.sum(axis=0) / len(points)
     cm = cm_x, cm_y

@@ -49,6 +49,13 @@ def contour_bbox_area(contour):
     return (x1 - x0) * (y1 - y0)
 
 
+def rescale_interval(v, v_min, v_max, new_min, new_max):
+    x = (v - v_min) / (v_max - v_min)
+    y = x * (new_max - new_min)
+
+    return y
+
+
 def calculate_contours_with_graph(
     mask, threshold, r, alpha, beta, gamma, delta, articulator, G, gravity_curve, **kwargs
 ):
@@ -62,6 +69,14 @@ def calculate_contours_with_graph(
     else:
         mask_thr = mask.copy()
         mask_thr[mask_thr <= threshold] = 0.
+
+        v_min = mask_thr[np.where(mask_thr > 0.)].min()
+        v_max = mask_thr[np.where(mask_thr > 0.)].max()
+
+        mask_thr[np.where(mask_thr > 0.)] = rescale_interval(
+            mask_thr[np.where(mask_thr > 0.)],
+            v_min, v_max, 0., 1.
+        )
 
     contour_points, c = find_contour_points(mask_thr)
     if articulator in (SOFT_PALATE, VOCAL_FOLDS):

@@ -25,10 +25,10 @@ PostProcessingCfg = namedtuple(
         "beta",
         "gamma",
         "delta",
+        "G",
         "upscale",
         "max_upscale_iter",
-        "threshold",
-        "G"
+        "threshold"
     ]
 )
 
@@ -40,10 +40,10 @@ POST_PROCESSING = {
         beta=1,
         gamma=0.05,
         delta=0,
+        G=0.0,
         upscale=256,
         max_upscale_iter=3,
-        threshold=0.7,
-        G=0.0
+        threshold=0.7
     ),
 
     EPIGLOTTIS: PostProcessingCfg(
@@ -52,10 +52,10 @@ POST_PROCESSING = {
         beta=10,
         gamma=0,
         delta=0,
+        G=0.0,
         upscale=256,
         max_upscale_iter=3,
-        threshold=0.3,
-        G=0.0
+        threshold=0.3
     ),
 
     HYOID_BONE: PostProcessingCfg(
@@ -64,10 +64,10 @@ POST_PROCESSING = {
         beta=1,
         gamma=0.05,
         delta=0,
+        G=0.0,
         upscale=256,
         max_upscale_iter=3,
-        threshold=0.6,
-        G=0.0
+        threshold=0.6
     ),
 
     LOWER_LIP: PostProcessingCfg(
@@ -76,10 +76,10 @@ POST_PROCESSING = {
         beta=10,
         gamma=0,
         delta=0,
+        G=0.0,
         upscale=256,
         max_upscale_iter=3,
-        threshold=0.4,
-        G=0.0
+        threshold=0.4
     ),
 
     PHARYNX: PostProcessingCfg(
@@ -88,10 +88,10 @@ POST_PROCESSING = {
         beta=10,
         gamma=0,
         delta=0,
+        G=0.0,
         upscale=256,
         max_upscale_iter=3,
-        threshold=0.5,
-        G=0.0
+        threshold=0.5
     ),
 
     # SOFT_PALATE: PostProcessingCfg(
@@ -100,10 +100,10 @@ POST_PROCESSING = {
     #     beta=1,
     #     gamma=0.05,
     #     delta=0,
+    #     G=0.0,
     #     upscale=256,
     #     max_upscale_iter=3,
-    #     threshold=0.3,
-    #     G=0.0
+    #     threshold=0.3
     # ),
     SOFT_PALATE: PostProcessingCfg(
         method=GRAPH_BASED,
@@ -111,10 +111,10 @@ POST_PROCESSING = {
         beta=10,
         gamma=0,
         delta=0,
+        G=0.0,
         upscale=256,
         max_upscale_iter=3,
-        threshold=0.1,
-        G=0.0
+        threshold=0.1
     ),
 
     THYROID_CARTILAGE: PostProcessingCfg(
@@ -123,22 +123,22 @@ POST_PROCESSING = {
         beta=1,
         gamma=0.05,
         delta=0,
+        G=0.0,
         upscale=256,
         max_upscale_iter=3,
-        threshold=0.8,
-        G=0.0
+        threshold=0.8
     ),
 
     TONGUE: PostProcessingCfg(
         method=GRAPH_BASED,
-        alpha=1,
-        beta=100,
+        alpha=1e-7,
+        beta=1e0,
         gamma=0,
-        delta=1e7,
+        delta=1e0,
+        G=5e-4,
         upscale=136,
         max_upscale_iter=4,
-        threshold=0.2,
-        G=500
+        threshold=0.2
     ),
 
     # UPPER_LIP: PostProcessingCfg(
@@ -147,10 +147,10 @@ POST_PROCESSING = {
     #     beta=1,
     #     gamma=0.05,
     #     delta=0,
+    #     G=0.0,
     #     upscale=256,
     #     max_upscale_iter=3,
-    #     threshold=0.4,
-    #     G=0.
+    #     threshold=0.4
     # ),
     UPPER_LIP: PostProcessingCfg(
         method=GRAPH_BASED,
@@ -158,10 +158,10 @@ POST_PROCESSING = {
         beta=10,
         gamma=0,
         delta=0,
+        G=0.0,
         upscale=256,
         max_upscale_iter=3,
-        threshold=0.4,
-        G=0.0
+        threshold=0.4
     ),
 
     # VOCAL_FOLDS: PostProcessingCfg(
@@ -170,10 +170,10 @@ POST_PROCESSING = {
     #     beta=10,
     #     gamma=0,
     #     delta=0,
+    #     G=0.0,
     #     upscale=256,
     #     max_upscale_iter=3,
-    #     threshold=0.7,
-    #     G=0.0
+    #     threshold=0.7
     # ),
     VOCAL_FOLDS: PostProcessingCfg(
         method=SKIMAGE,
@@ -181,9 +181,9 @@ POST_PROCESSING = {
         beta=10,
         gamma=0,
         delta=0,
+        G=0.0,
         upscale=256,
         max_upscale_iter=3,
-        threshold=0.7,
-        G=0.0
+        threshold=0.7
     ),
 }
