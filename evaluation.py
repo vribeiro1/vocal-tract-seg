@@ -1,6 +1,5 @@
 import pdb
 
-import cv2
 import funcy
 import numpy as np
 import os
@@ -11,23 +10,33 @@ from PIL import Image, ImageDraw
 from tqdm import tqdm
 
 from connect_points import calculate_contour, draw_contour
-from dataset import VocalTractMaskRCNNDataset
 from metrics import evaluate_model
-from settings import *
+from settings import (
+    ARYTENOID_MUSCLE,
+    EPIGLOTTIS,
+    LOWER_INCISOR,
+    LOWER_LIP,
+    PHARYNX,
+    SOFT_PALATE,
+    THYROID_CARTILAGE,
+    TONGUE,
+    UPPER_INCISOR,
+    UPPER_LIP,
+    VOCAL_FOLDS
+)
 
 COLORS = {
-    "arytenoid-muscle": "blueviolet",
-    "epiglottis": "turquoise",
-    "hyoid-bone": "slategray",
-    "lower-incisor": "cyan",
-    "lower-lip": "lime",
-    "pharynx": "goldenrod",
-    "soft-palate": "dodgerblue",
-    "thyroid-cartilage": "saddlebrown",
-    "tongue": "darkorange",
-    "upper-incisor": "yellow",
-    "upper-lip": "magenta",
-    "vocal-folds": "hotpink"
+    ARYTENOID_MUSCLE: "blueviolet",
+    EPIGLOTTIS: "turquoise",
+    LOWER_INCISOR: "cyan",
+    LOWER_LIP: "lime",
+    PHARYNX: "goldenrod",
+    SOFT_PALATE: "dodgerblue",
+    THYROID_CARTILAGE: "saddlebrown",
+    TONGUE: "darkorange",
+    UPPER_INCISOR: "yellow",
+    UPPER_LIP: "magenta",
+    VOCAL_FOLDS: "hotpink"
 }
 
 

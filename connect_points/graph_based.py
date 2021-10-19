@@ -27,15 +27,6 @@ def point_serialize(pt):
     return " ".join(map(str, pt))
 
 
-def uint16_to_uint8(image):
-    max_val = np.amax(image)
-    image = image.astype(float) * 255. / max_val
-    image = image.astype(np.uint8)
-    image = cv2.equalizeHist(image)
-    image = image.astype(np.uint8)
-    return image
-
-
 def shortest_path(edges, source, sink):
     """
     This function is from https://gist.github.com/hanfang/89d38425699484cd3da80ca086d78129
