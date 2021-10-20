@@ -9,8 +9,7 @@ from copy import deepcopy
 from PIL import Image, ImageDraw
 from tqdm import tqdm
 
-from connect_points import calculate_contour, draw_contour
-from metrics import evaluate_model
+from connect_points import calculate_contour
 from settings import (
     ARYTENOID_MUSCLE,
     EPIGLOTTIS,
@@ -24,6 +23,9 @@ from settings import (
     UPPER_LIP,
     VOCAL_FOLDS
 )
+
+from helpers import draw_contour
+from metrics import evaluate_model
 
 COLORS = {
     ARYTENOID_MUSCLE: "blueviolet",
