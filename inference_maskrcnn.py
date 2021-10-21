@@ -13,26 +13,17 @@ from PIL import Image
 from torch.utils.data import DataLoader
 from torchvision.models.detection.mask_rcnn import maskrcnn_resnet50_fpn
 from tqdm import tqdm
+from vt_tracker.postprocessing.calculate_contours import calculate_contour
 
 from bs_regularization import regularize_Bsplines
 from dataset import VocalTractMaskRCNNDataset
-from evaluation import calculate_contour
 from helpers import set_seeds
 from settings import *
-
-COLORS = {
-    "epiglottis": (153, 204, 0),
-    "lower-lip": (102, 255, 51),
-    "upper-lip": (255, 51, 204),
-    "tongue": (255, 102, 0),
-    "soft-palate": (102, 102, 255),
-    "pharynx": (255, 128, 128)
-}
 
 
 class InferenceVocalTractMaskRCNNDataset(VocalTractMaskRCNNDataset):
     @staticmethod
-    def _collect_data(datadir, sequences, classes, annotation, allow_missing=False):
+    def _collect_data(datadir, sequences, *args, **kwargs):
         data = []
 
         for subject, sequence in sequences:
@@ -114,7 +105,7 @@ def run_inference(model, dataloader, outputs_dir, class_map, threshold=None, dev
         with torch.set_grad_enabled(False):
             outputs = model(inputs)
 
-            for j, (im_info, im_outputs) in enumerate(zip(info, outputs)):
+            for _, (im_info, im_outputs) in enumerate(zip(info, outputs)):
                 zipped = list(zip(
                     im_outputs["boxes"],
                     im_outputs["labels"],
@@ -193,9 +184,6 @@ def load_outputs_from_directory(outputs_dir, subj_sequences, classes):
             if pred_class not in classes:
                 continue
 
-            # img = Image.open(filepath).convert("L")
-            # img_arr = np.array(img) / 255.
-
             out = {
                 "subject": subject,
                 "sequence": sequence,
@@ -216,8 +204,7 @@ def load_outputs_from_directory(outputs_dir, subj_sequences, classes):
 
 def smooth_contour(contour):
     resX, resY = regularize_Bsplines(contour, 3)
-    return np.array([resX, resY]).transpose(1, 0)
-
+    return np.array([resX, resY]).T
 
 def process_out(out, save_to):
     subject = out["subject"]

@@ -13,22 +13,12 @@ from scipy import interpolate
 from skimage.measure import regionprops
 from torch.utils.data import Dataset
 from torchvision import transforms
+from vt_tracker.helpers import uint16_to_uint8
 
 from read_roi import read_roi_zip
 
 MASK = "mask"
 ROI = "roi"
-
-
-def uint16_to_uint8(img_arr, norm_hist=True):
-    max_val = np.amax(img_arr)
-    img_arr = img_arr.astype(float) * 255 / max_val
-    img_arr = img_arr.astype(np.uint8)
-
-    if norm_hist:
-        img_arr = cv2.equalizeHist(img_arr)
-
-    return img_arr.astype(np.uint8)
 
 
 class VocalTractMaskRCNNDataset(Dataset):
