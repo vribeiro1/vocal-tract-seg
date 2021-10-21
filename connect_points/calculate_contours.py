@@ -1,3 +1,5 @@
+import pdb
+
 import cv2
 import funcy
 import numpy as np
@@ -47,13 +49,34 @@ def contour_bbox_area(contour):
     return (x1 - x0) * (y1 - y0)
 
 
-def calculate_contours_with_graph(mask, threshold, r, alpha, beta, gamma, articulator, **kwargs):
-    mask_thr = threshold_array(mask, threshold)
+def rescale_interval(v, v_min, v_max, new_min, new_max):
+    x = (v - v_min) / (v_max - v_min)
+    y = x * (new_max - new_min)
 
-    if articulator == SOFT_PALATE:
-        mask_thr = binary_fill_holes(mask_thr)
+    return y
 
-    mask_thr = skeletonize(mask_thr).astype(np.uint8)
+
+def calculate_contours_with_graph(
+    mask, threshold, r, alpha, beta, gamma, delta, articulator, G, gravity_curve, **kwargs
+):
+    if articulator != TONGUE:
+        mask_thr = threshold_array(mask, threshold)
+
+        if articulator == SOFT_PALATE:
+            mask_thr = binary_fill_holes(mask_thr)
+
+        mask_thr = skeletonize(mask_thr).astype(np.uint8)
+    else:
+        mask_thr = mask.copy()
+        mask_thr[mask_thr <= threshold] = 0.
+
+        v_min = mask_thr[np.where(mask_thr > 0.)].min()
+        v_max = mask_thr[np.where(mask_thr > 0.)].max()
+
+        mask_thr[np.where(mask_thr > 0.)] = rescale_interval(
+            mask_thr[np.where(mask_thr > 0.)],
+            v_min, v_max, 0., 1.
+        )
 
     contour_points, c = find_contour_points(mask_thr)
     if articulator in (SOFT_PALATE, VOCAL_FOLDS):
@@ -66,12 +89,21 @@ def calculate_contours_with_graph(mask, threshold, r, alpha, beta, gamma, articu
     if source is None or sink is None:
         return []
 
-    contour, _, _ = connect_points_graph_based(mask_thr, contour_points, r, alpha, beta, gamma, tails=(source, sink))
+    contour, _, _ = connect_points_graph_based(
+        mask_thr,
+        contour_points,
+        r, alpha, beta, gamma, delta,
+        tails=(source, sink),
+        G=G,
+        gravity_curve=gravity_curve
+    )
 
     return contour
 
 
-def calculate_contours_with_active_contours(mask, threshold, alpha, beta, gamma, articulator, **kwargs):
+def calculate_contours_with_active_contours(
+    mask, threshold, alpha, beta, gamma, articulator, **kwargs
+):
     mask_thr = threshold_array(mask, threshold).copy()
 
     if articulator in (UPPER_LIP, LOWER_LIP, TONGUE, SOFT_PALATE):
@@ -171,7 +203,10 @@ def upscale_mask(mask_, upscale):
     return mask, rescale_contour_fn
 
 
-def _calculate_contour_threshold_loop(post_processing_fn, mask, threshold, articulator, alpha, beta, gamma):
+def _calculate_contour_threshold_loop(
+    post_processing_fn, mask, threshold, articulator, alpha, beta, gamma, delta,
+    G=0.0, gravity_curve=None
+):
     min_length = 10
     min_threshold = 0.00005
     contour = []
@@ -184,17 +219,20 @@ def _calculate_contour_threshold_loop(post_processing_fn, mask, threshold, artic
             r=3,
             alpha=alpha,
             beta=beta,
-            gamma=gamma
+            gamma=gamma,
+            delta=delta,
+            G=G,
+            gravity_curve=gravity_curve
         )
 
-        threshold = threshold * 0.9
+        threshold = threshold * 0.8
         if threshold < min_threshold:
             break
 
     return contour
 
 
-def calculate_contour(articulator, mask):
+def calculate_contour(articulator, mask, gravity_curve=None):
     if articulator not in POST_PROCESSING:
         raise KeyError(
             f"Class '{articulator}' does not have post-processing parameters configured"
@@ -208,9 +246,14 @@ def calculate_contour(articulator, mask):
     for i in range(1, max_upscale_iter + 1):
         upscale = i * post_proc.upscale
 
-        # If we upscale before post-processing, we need to define a function to rescale the generated
-        # contour. Else, we use an identity function as a placeholder.
+        # If we upscale before post-processing, we need to define a function to rescale the
+        # generated contour. Else, we use an identity function as a placeholder.
         new_mask, rescale_contour_fn = upscale_mask(mask, upscale)
+
+        rescaled_gravity_curve = None
+        if gravity_curve is not None:
+            s_in, _ = mask.shape
+            rescaled_gravity_curve = rescale_contour(gravity_curve, s_in=s_in, s_out=upscale)
 
         post_processing_fn = METHODS[post_proc.method]
         contour = _calculate_contour_threshold_loop(
@@ -220,7 +263,10 @@ def calculate_contour(articulator, mask):
             articulator,
             post_proc.alpha,
             post_proc.beta,
-            post_proc.gamma
+            post_proc.gamma,
+            post_proc.delta,
+            post_proc.G,
+            rescaled_gravity_curve
         )
 
         if len(contour) > 10:

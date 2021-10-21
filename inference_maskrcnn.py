@@ -206,13 +206,28 @@ def smooth_contour(contour):
     resX, resY = regularize_Bsplines(contour, 3)
     return np.array([resX, resY]).T
 
-def process_out(out, save_to):
+def load_articulator_array(filepath):
+    """
+    Loads the target array with the proper orientation (right to left)
+    """
+
+    target_array = np.load(filepath)
+
+    # All the countors should be oriented from right to left. If it is the opposite,
+    # we flip the array.
+    if target_array[0][0] < target_array[-1][0]:
+        target_array = np.flip(target_array, axis=0)
+
+    return target_array.copy()
+
+
+def process_out(out, datadir, save_to):
     subject = out["subject"]
     sequence = out["sequence"]
     instance_number = out["instance_number"]
     pred_class = out["pred_cls"]
 
-    outputs_dir = os.path.join(cfg["save_to"], "inference_contours", subject, sequence)
+    outputs_dir = os.path.join(save_to, "inference_contours", subject, sequence)
     if not os.path.exists(outputs_dir):
         os.makedirs(outputs_dir)
 
@@ -223,7 +238,20 @@ def process_out(out, save_to):
     else:
         mask = out["mask"]
 
-    contour = calculate_contour(pred_class, mask)
+    gravity_curve_filepath = os.path.join(
+        datadir,
+        subject,
+        sequence,
+        "inference_contours",
+        f"{'%04d' % instance_number}_upper-incisor.npy"
+    )
+
+    if os.path.isfile(gravity_curve_filepath):
+        gravity_curve = load_articulator_array(gravity_curve_filepath)[:-10]
+    else:
+        gravity_curve = None
+
+    contour = calculate_contour(pred_class, mask, gravity_curve=gravity_curve)
     if len(contour) > 0:
         contour = smooth_contour(contour)
 
@@ -275,7 +303,7 @@ def main(cfg):
         outputs = load_outputs_from_directory(inference_directory, cfg["sequences"], cfg["classes"])
 
     for out in tqdm(outputs, desc="Calculating contours"):
-        process_out(out, cfg["save_to"])
+        process_out(out, cfg["datadir"], cfg["save_to"])
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 funcy
 kornia
+numba
 numpy
 opencv-python
 Pillow
