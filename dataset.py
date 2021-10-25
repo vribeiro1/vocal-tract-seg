@@ -69,7 +69,7 @@ class VocalTractMaskRCNNDataset(Dataset):
 
             for image_filepath in images:
                 image_dirname = os.path.dirname(os.path.dirname(image_filepath))
-                image_name = os.path.basename(image_filepath).rsplit(".", maxsplit=1)[0]
+                image_name, _ = os.path.basename(image_filepath).rsplit(".", maxsplit=1)
                 instance_number = int(image_name)
 
                 instance_number_m1 = instance_number - 1

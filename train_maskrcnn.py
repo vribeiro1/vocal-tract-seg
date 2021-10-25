@@ -48,13 +48,14 @@ def run_epoch(phase, epoch, model, dataloader, optimizer, writer=None, device=No
 
         optimizer.zero_grad()
         with torch.set_grad_enabled(training):
-            outputs = model(inputs, targets_dict)
+            with torch.autocast(device.type):
+                outputs = model(inputs, targets_dict)
 
-            loss = (
-                outputs["loss_classifier"] + \
-                outputs["loss_box_reg"] + \
-                outputs["loss_mask"]
-            )
+                loss = (
+                    outputs["loss_classifier"] + \
+                    outputs["loss_box_reg"] + \
+                    outputs["loss_mask"]
+                )
 
             if training:
                 loss.backward()
