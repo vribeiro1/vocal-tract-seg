@@ -7,12 +7,15 @@ import torch
 
 from copy import deepcopy
 from PIL import Image, ImageDraw
+from scipy.ndimage.morphology import binary_fill_holes
+from skimage.morphology import skeletonize
 from tqdm import tqdm
+from vt_tracker import EPIGLOTTIS, SOFT_PALATE
 from vt_tracker.metrics import p2cp_mean
 from vt_tracker.postprocessing.calculate_contours import calculate_contour
 
+from connect_points.active_contours import get_soft_palate_extremities
 from helpers import draw_contour
-from metrics import evaluate_model
 
 
 def save_image_with_contour(img, filepath, contour, target=None):
@@ -145,6 +148,20 @@ def run_test(epoch, model, dataloader, outputs_dir, class_map, threshold=None, d
     return return_outputs
 
 
+def soft_palate_mask_to_center_line(mask_):
+    mask = mask_.copy()
+
+    ext1, ext2, ext3 = get_soft_palate_extremities(mask)
+    x1, y1 = ext1
+    x2, y2 = ext2
+
+    mask[y2:y1+1, x1] = mask.max()
+    filled_mask = binary_fill_holes(mask).astype(np.uint8)
+    center_line = skeletonize(filled_mask) * 255
+
+    return center_line
+
+
 def run_evaluation(outputs, classes, save_to=None, load_fn=None):
     pred_classes = []
     targets = []
@@ -152,7 +169,10 @@ def run_evaluation(outputs, classes, save_to=None, load_fn=None):
     for out in outputs:
         target = out["target"] * 255
         mask = out["mask"]
-        pred_class = out['pred_cls']
+        pred_class = out["pred_cls"]
+
+        if pred_class in [EPIGLOTTIS, SOFT_PALATE]:
+            target = soft_palate_mask_to_center_line(target)
 
         contour = calculate_contour(pred_class, mask)
 
