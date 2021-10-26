@@ -191,9 +191,17 @@ class VocalTractMaskRCNNDataset(Dataset):
     @staticmethod
     def get_box_from_mask_tensor(mask, margin=0):
         mask_np = mask.numpy().astype(np.uint8)
+        w, h = mask_np.shape
+
         props = regionprops(mask_np)
         y0, x0, y1, x1 = props[0]["bbox"]
-        return torch.tensor([x0 - margin, y0 - margin, x1 + margin, y1 + margin], dtype=torch.float)
+
+        bbox_x0 = max(0, x0 - margin)
+        bbox_y0 = max(0, y0 - margin)
+        bbox_x1 = min(w - 1, x1 + margin)
+        bbox_y1 = min(h - 1, y1 + margin)
+
+        return torch.tensor([bbox_x0, bbox_y0, bbox_x1, bbox_y1], dtype=torch.float)
 
     @staticmethod
     def calc_bounding_box_area(bbox):

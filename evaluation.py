@@ -82,7 +82,7 @@ def run_test(epoch, model, dataloader, outputs_dir, class_map, threshold=None, d
     progress_bar = tqdm(dataloader, desc=f"Epoch {epoch} - inference")
 
     return_outputs = []
-    for i, (info, inputs, targets_dict) in enumerate(progress_bar):
+    for _, (info, inputs, targets_dict) in enumerate(progress_bar):
         inputs = inputs.to(device)
         targets_dict = [{
             k: v.to(device) for k, v in d.items()
@@ -91,7 +91,7 @@ def run_test(epoch, model, dataloader, outputs_dir, class_map, threshold=None, d
         with torch.set_grad_enabled(False):
             outputs = model(inputs)
 
-            for j, (im_info, im_outputs, targets_dict) in enumerate(zip(info, outputs, targets_dict)):
+            for _, (im_info, im_outputs, targets_dict) in enumerate(zip(info, outputs, targets_dict)):
                 targets = targets_dict["masks"]
 
                 zipped = list(zip(
@@ -102,7 +102,7 @@ def run_test(epoch, model, dataloader, outputs_dir, class_map, threshold=None, d
                 ))
 
                 detected = []
-                for c_idx, c in class_map.items():
+                for c_idx, _ in class_map.items():
                     art_list = funcy.lfilter(lambda t: t[1].item() == c_idx, zipped)
                     if len(art_list) > 0:
                         art = max(art_list, key=lambda t: t[2])

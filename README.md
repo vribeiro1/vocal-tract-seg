@@ -1,20 +1,27 @@
 # Deep contour delineation of vocal tract articulaty structures from RT-MRI
 
-<b>Vinicius de Paulo Souza Ribeiro</b><br>
-LORIA - Laboratoire Lorrain de Recherche en Informatique et ses Applications<br>
-Université de Lorraine
-
-<b>Contact me:</b><br>
-<b>E-mail:</b> vinicius.souza-ribeiro@loria.com<br>
-<b>Web:</b> https://vribeiro1.github.io<br>
-
-<hr>
-
-## Examples
-
 <br>
 
 <img src="static/img/8066_0009_6.gif"> <img src="static/img/8066_0010_4.gif">
 
 <br>
-<hr>
+
+# VT Tracker Dependency
+
+This repository requires vt_tracker, which can be found at <a href="https://gitlab.inria.fr/vsouzari/vt_tracker">Inria's Gitlab</a>. To install the library, follow the instructions bellow.
+
+<ol>
+
+<li>Clone the repo</li>
+
+```
+>>> git clone git@gitlab.inria.fr:vsouzari/vt_tracker.git
+```
+
+<li>Install the repo</li>
+
+```
+>>> pip3 install -e /path/to/vt_tracker
+```
+
+</ol>

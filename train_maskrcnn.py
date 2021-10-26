@@ -5,7 +5,6 @@ import json
 import numpy as np
 import os
 import torch
-import torch.nn as nn
 
 from sacred import Experiment
 from sacred.observers import FileStorageObserver
@@ -13,15 +12,10 @@ from tensorboardX import SummaryWriter
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau, CyclicLR
 from torch.utils.data import DataLoader
-from torchvision import transforms
 from torchvision.models.detection.mask_rcnn import maskrcnn_resnet50_fpn
 from tqdm import tqdm
 
-from augmentations import (MultiCompose,
-                           MultiRandomHorizontalFlip,
-                           MultiRandomRotation,
-                           MultiRandomVerticalFlip)
-from copy import deepcopy
+from augmentations import MultiCompose, MultiRandomRotation
 from dataset import VocalTractMaskRCNNDataset
 from evaluation import run_evaluation, run_test
 from helpers import set_seeds
@@ -48,14 +42,13 @@ def run_epoch(phase, epoch, model, dataloader, optimizer, writer=None, device=No
 
         optimizer.zero_grad()
         with torch.set_grad_enabled(training):
-            with torch.autocast(device.type):
-                outputs = model(inputs, targets_dict)
+            outputs = model(inputs, targets_dict)
 
-                loss = (
-                    outputs["loss_classifier"] + \
-                    outputs["loss_box_reg"] + \
-                    outputs["loss_mask"]
-                )
+            loss = (
+                outputs["loss_classifier"] + \
+                outputs["loss_box_reg"] + \
+                outputs["loss_mask"]
+            )
 
             if training:
                 loss.backward()
@@ -88,7 +81,6 @@ def main(_run, datadir, batch_size, n_epochs, patience, learning_rate,
          train_sequences, valid_sequences, test_sequences, classes, size, mode,
          state_dict_fpath=None):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    num_classes = len(classes)
 
     writer = SummaryWriter(os.path.join(fs_observer.dir, f"experiment-{_run._id}"))
     best_model_path = os.path.join(fs_observer.dir, "best_model.pth")
@@ -105,18 +97,19 @@ def main(_run, datadir, batch_size, n_epochs, patience, learning_rate,
     model.to(device)
 
     optimizer = Adam(model.parameters(), lr=learning_rate)
-    base_lr = learning_rate / 10
-    max_lr = learning_rate * 10
-    scheduler = CyclicLR(
-        optimizer,
-        base_lr=base_lr,
-        max_lr=max_lr,
-        cycle_momentum=False
-    )
+
+    # base_lr = learning_rate / 10
+    # max_lr = learning_rate * 10
+    # scheduler = CyclicLR(
+    #     optimizer,
+    #     base_lr=base_lr,
+    #     max_lr=max_lr,
+    #     cycle_momentum=False
+    # )
+
+    scheduler = ReduceLROnPlateau(optimizer, factor=0.1, patience=10)
 
     augmentations = MultiCompose([
-        # MultiRandomHorizontalFlip(),
-        # MultiRandomVerticalFlip(),
         MultiRandomRotation([-5, 5]),
     ])
 
@@ -177,7 +170,7 @@ def main(_run, datadir, batch_size, n_epochs, patience, learning_rate,
             device=device
         )
 
-        scheduler.step()
+        scheduler.step(info[VALID]["loss"])
 
         if info[VALID]["loss"] < best_metric:
             best_metric = info[VALID]["loss"]
