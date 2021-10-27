@@ -1,6 +1,5 @@
 import pdb
 
-import funcy
 import json
 import numpy as np
 import os
@@ -10,7 +9,7 @@ from sacred import Experiment
 from sacred.observers import FileStorageObserver
 from tensorboardX import SummaryWriter
 from torch.optim import Adam
-from torch.optim.lr_scheduler import ReduceLROnPlateau, CyclicLR
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader
 from torchvision.models.detection.mask_rcnn import maskrcnn_resnet50_fpn
 from tqdm import tqdm
@@ -43,11 +42,12 @@ def run_epoch(phase, epoch, model, dataloader, optimizer, writer=None, device=No
         optimizer.zero_grad()
         with torch.set_grad_enabled(training):
             outputs = model(inputs, targets_dict)
-
             loss = (
                 outputs["loss_classifier"] + \
                 outputs["loss_box_reg"] + \
-                outputs["loss_mask"]
+                outputs["loss_mask"] + \
+                outputs["loss_objectness"] + \
+                outputs["loss_rpn_box_reg"]
             )
 
             if training:
@@ -97,16 +97,6 @@ def main(_run, datadir, batch_size, n_epochs, patience, learning_rate,
     model.to(device)
 
     optimizer = Adam(model.parameters(), lr=learning_rate)
-
-    # base_lr = learning_rate / 10
-    # max_lr = learning_rate * 10
-    # scheduler = CyclicLR(
-    #     optimizer,
-    #     base_lr=base_lr,
-    #     max_lr=max_lr,
-    #     cycle_momentum=False
-    # )
-
     scheduler = ReduceLROnPlateau(optimizer, factor=0.1, patience=10)
 
     augmentations = MultiCompose([

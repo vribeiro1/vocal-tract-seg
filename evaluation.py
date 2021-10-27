@@ -50,6 +50,9 @@ def draw_bbox(mask, bbox, text=None):
 
 
 def evaluate_model(targets, contours):
+    """
+    Calculates the point-to-closest-point distance (in px) between two curves drawn in an image.
+    """
     targets = np.squeeze(targets)
 
     p2cps = []

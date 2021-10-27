@@ -1,6 +1,5 @@
 import pdb
 
-import cv2
 import funcy
 import numpy as np
 import os
@@ -282,9 +281,9 @@ class VocalTractMaskRCNNDataset(Dataset):
 
         img_arr = self.to_tensor(self.resize(img))
         if self.annotation == ROI:
-            masks, missing = self.create_target(data_item["rois"], img.size)
+            masks, _ = self.create_target(data_item["rois"], img.size)
         else:
-            masks, missing = self.load_target(data_item["seg_masks"])
+            masks, _ = self.load_target(data_item["seg_masks"])
 
         masks[masks > 0.5] = 1.0
         masks[masks <= 0.5] = 0.0
