@@ -7,39 +7,15 @@ import torch
 
 from copy import deepcopy
 from PIL import Image, ImageDraw
+from scipy.ndimage.morphology import binary_fill_holes
+from skimage.morphology import skeletonize
 from tqdm import tqdm
+from vt_tracker import EPIGLOTTIS, SOFT_PALATE
+from vt_tracker.metrics import p2cp_mean
+from vt_tracker.postprocessing.calculate_contours import calculate_contour
 
-from connect_points import calculate_contour
-from settings import (
-    ARYTENOID_MUSCLE,
-    EPIGLOTTIS,
-    LOWER_INCISOR,
-    LOWER_LIP,
-    PHARYNX,
-    SOFT_PALATE,
-    THYROID_CARTILAGE,
-    TONGUE,
-    UPPER_INCISOR,
-    UPPER_LIP,
-    VOCAL_FOLDS
-)
-
+from connect_points.active_contours import get_soft_palate_extremities
 from helpers import draw_contour
-from metrics import evaluate_model
-
-COLORS = {
-    ARYTENOID_MUSCLE: "blueviolet",
-    EPIGLOTTIS: "turquoise",
-    LOWER_INCISOR: "cyan",
-    LOWER_LIP: "lime",
-    PHARYNX: "goldenrod",
-    SOFT_PALATE: "dodgerblue",
-    THYROID_CARTILAGE: "saddlebrown",
-    TONGUE: "darkorange",
-    UPPER_INCISOR: "yellow",
-    UPPER_LIP: "magenta",
-    VOCAL_FOLDS: "hotpink"
-}
 
 
 def save_image_with_contour(img, filepath, contour, target=None):
@@ -73,6 +49,30 @@ def draw_bbox(mask, bbox, text=None):
     return mask_img
 
 
+def evaluate_model(targets, contours):
+    """
+    Calculates the point-to-closest-point distance (in px) between two curves drawn in an image.
+    """
+    targets = np.squeeze(targets)
+
+    p2cps = []
+    for target, predicted in zip(targets, contours):
+        x_targets, y_targets = np.where(target == 255)
+        target_points = list(zip(x_targets, y_targets))
+
+        x_preds, y_preds = np.where(predicted == 255)
+        preds_points = list(zip(x_preds, y_preds))
+
+        mean_p2cp = p2cp_mean(target_points, preds_points)
+        p2cps.append(mean_p2cp)
+
+    mean = np.mean(p2cps)
+    sigma = np.std(p2cps)
+    median = np.median(p2cps)
+
+    return mean, sigma, median
+
+
 def run_test(epoch, model, dataloader, outputs_dir, class_map, threshold=None, device=None):
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -85,7 +85,7 @@ def run_test(epoch, model, dataloader, outputs_dir, class_map, threshold=None, d
     progress_bar = tqdm(dataloader, desc=f"Epoch {epoch} - inference")
 
     return_outputs = []
-    for i, (info, inputs, targets_dict) in enumerate(progress_bar):
+    for _, (info, inputs, targets_dict) in enumerate(progress_bar):
         inputs = inputs.to(device)
         targets_dict = [{
             k: v.to(device) for k, v in d.items()
@@ -94,7 +94,7 @@ def run_test(epoch, model, dataloader, outputs_dir, class_map, threshold=None, d
         with torch.set_grad_enabled(False):
             outputs = model(inputs)
 
-            for j, (im_info, im_outputs, targets_dict) in enumerate(zip(info, outputs, targets_dict)):
+            for _, (im_info, im_outputs, targets_dict) in enumerate(zip(info, outputs, targets_dict)):
                 targets = targets_dict["masks"]
 
                 zipped = list(zip(
@@ -105,7 +105,7 @@ def run_test(epoch, model, dataloader, outputs_dir, class_map, threshold=None, d
                 ))
 
                 detected = []
-                for c_idx, c in class_map.items():
+                for c_idx, _ in class_map.items():
                     art_list = funcy.lfilter(lambda t: t[1].item() == c_idx, zipped)
                     if len(art_list) > 0:
                         art = max(art_list, key=lambda t: t[2])
@@ -151,6 +151,20 @@ def run_test(epoch, model, dataloader, outputs_dir, class_map, threshold=None, d
     return return_outputs
 
 
+def soft_palate_mask_to_center_line(mask_):
+    mask = mask_.copy()
+
+    ext1, ext2, ext3 = get_soft_palate_extremities(mask)
+    x1, y1 = ext1
+    x2, y2 = ext2
+
+    mask[y2:y1+1, x1] = mask.max()
+    filled_mask = binary_fill_holes(mask).astype(np.uint8)
+    center_line = skeletonize(filled_mask) * 255
+
+    return center_line
+
+
 def run_evaluation(outputs, classes, save_to=None, load_fn=None):
     pred_classes = []
     targets = []
@@ -158,7 +172,10 @@ def run_evaluation(outputs, classes, save_to=None, load_fn=None):
     for out in outputs:
         target = out["target"] * 255
         mask = out["mask"]
-        pred_class = out['pred_cls']
+        pred_class = out["pred_cls"]
+
+        if pred_class in [EPIGLOTTIS, SOFT_PALATE]:
+            target = soft_palate_mask_to_center_line(target)
 
         contour = calculate_contour(pred_class, mask)
 

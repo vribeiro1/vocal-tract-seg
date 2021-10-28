@@ -44,7 +44,7 @@ def get_soft_palate_extremities(mask_arr, min_diff=4):
     x0, y0, x1, y1 = box
 
     x0_arr = mask_arr[:, x0]
-    indices = np.where(x0_arr == 1)[0]
+    indices = np.where(x0_arr == mask_arr.max())[0]
     y_min = indices.min()
     y_max = indices.max()
 

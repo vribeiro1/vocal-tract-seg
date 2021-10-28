@@ -1,6 +1,5 @@
 import pdb
 
-import cv2
 import funcy
 import numpy as np
 import os
@@ -13,22 +12,12 @@ from scipy import interpolate
 from skimage.measure import regionprops
 from torch.utils.data import Dataset
 from torchvision import transforms
+from vt_tracker.helpers import uint16_to_uint8
 
 from read_roi import read_roi_zip
 
 MASK = "mask"
 ROI = "roi"
-
-
-def uint16_to_uint8(img_arr, norm_hist=True):
-    max_val = np.amax(img_arr)
-    img_arr = img_arr.astype(float) * 255 / max_val
-    img_arr = img_arr.astype(np.uint8)
-
-    if norm_hist:
-        img_arr = cv2.equalizeHist(img_arr)
-
-    return img_arr.astype(np.uint8)
 
 
 class VocalTractMaskRCNNDataset(Dataset):
@@ -79,7 +68,7 @@ class VocalTractMaskRCNNDataset(Dataset):
 
             for image_filepath in images:
                 image_dirname = os.path.dirname(os.path.dirname(image_filepath))
-                image_name = os.path.basename(image_filepath).rsplit(".", maxsplit=1)[0]
+                image_name, _ = os.path.basename(image_filepath).rsplit(".", maxsplit=1)
                 instance_number = int(image_name)
 
                 instance_number_m1 = instance_number - 1
@@ -201,9 +190,17 @@ class VocalTractMaskRCNNDataset(Dataset):
     @staticmethod
     def get_box_from_mask_tensor(mask, margin=0):
         mask_np = mask.numpy().astype(np.uint8)
+        w, h = mask_np.shape
+
         props = regionprops(mask_np)
         y0, x0, y1, x1 = props[0]["bbox"]
-        return torch.tensor([x0 - margin, y0 - margin, x1 + margin, y1 + margin], dtype=torch.float)
+
+        bbox_x0 = max(0, x0 - margin)
+        bbox_y0 = max(0, y0 - margin)
+        bbox_x1 = min(w - 1, x1 + margin)
+        bbox_y1 = min(h - 1, y1 + margin)
+
+        return torch.tensor([bbox_x0, bbox_y0, bbox_x1, bbox_y1], dtype=torch.float)
 
     @staticmethod
     def calc_bounding_box_area(bbox):
@@ -284,9 +281,9 @@ class VocalTractMaskRCNNDataset(Dataset):
 
         img_arr = self.to_tensor(self.resize(img))
         if self.annotation == ROI:
-            masks, missing = self.create_target(data_item["rois"], img.size)
+            masks, _ = self.create_target(data_item["rois"], img.size)
         else:
-            masks, missing = self.load_target(data_item["seg_masks"])
+            masks, _ = self.load_target(data_item["seg_masks"])
 
         masks[masks > 0.5] = 1.0
         masks[masks <= 0.5] = 0.0
