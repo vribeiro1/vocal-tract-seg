@@ -3,6 +3,7 @@ import pdb
 import funcy
 import numpy as np
 import os
+import pandas as pd
 import pydicom
 import torch
 
@@ -20,7 +21,42 @@ MASK = "mask"
 ROI = "roi"
 
 
-class VocalTractMaskRCNNDataset(Dataset):
+class InputLoaderMixin:
+    @staticmethod
+    def read_dcm(dcm_fpath, mode="RGB"):
+        ds = pydicom.dcmread(dcm_fpath, force=True)
+        img = Image.fromarray(uint16_to_uint8(ds.pixel_array))
+
+        return img.convert(mode)
+
+    @staticmethod
+    def _load_input_rgb(R_filepath, G_filepath, B_filepath):
+        to_tensor = transforms.ToTensor()
+        to_pil = transforms.ToPILImage()
+
+        g = InputLoaderMixin.read_dcm(G_filepath, "L")
+        g_arr = to_tensor(g)
+
+        r = InputLoaderMixin.read_dcm(R_filepath, "L") if R_filepath is not None else None
+        r_arr = to_tensor(r) if r is not None else g_arr
+
+        b = InputLoaderMixin.read_dcm(B_filepath, "L") if B_filepath is not None else None
+        b_arr = to_tensor(b) if b is not None else g_arr
+
+        rgb = torch.cat([r_arr, g_arr, b_arr], dim=0)
+        return to_pil(rgb)
+
+    @staticmethod
+    def _load_input_gray(self, R_filepath, G_filepath, B_filepath):
+        return self.read_dcm(G_filepath)
+
+    @classmethod
+    def load_input(cls, R_filepath, G_filepath, B_filepath, mode):
+        load_fn = getattr(cls, f"_load_input_{mode}")
+        return load_fn(R_filepath, G_filepath, B_filepath)
+
+
+class VocalTractMaskRCNNDataset(Dataset, InputLoaderMixin):
     def __init__(self, datadir, subj_sequences, classes, size=(224, 224), annotation=MASK, augmentations=None, mode="gray", allow_missing=False):
         if annotation not in (MASK, ROI):
             raise ValueError(f"Annotation level should be either '{MASK}' or '{ROI}'")
@@ -48,7 +84,6 @@ class VocalTractMaskRCNNDataset(Dataset):
         self.classes = sorted(classes)
         self.classes_dict = {c: i + 1 for i, c in enumerate(self.classes)}
 
-        self.to_pil = transforms.ToPILImage()
         self.to_tensor = transforms.ToTensor()
         self.normalize = transforms.Normalize(
             mean=torch.tensor([0.485, 0.456, 0.406]),
@@ -147,13 +182,6 @@ class VocalTractMaskRCNNDataset(Dataset):
         return masks
 
     @staticmethod
-    def read_dcm(dcm_fpath, mode="RGB"):
-        ds = pydicom.dcmread(dcm_fpath, force=True)
-        img = Image.fromarray(uint16_to_uint8(ds.pixel_array))
-
-        return img.convert(mode)
-
-    @staticmethod
     def _remove_duplicates(iterable):
         seen = set()
         return [item for item in iterable if not (item in seen or seen.add(item))]
@@ -247,26 +275,6 @@ class VocalTractMaskRCNNDataset(Dataset):
         target = torch.stack(targets)
         return target.float(), missing
 
-    def _load_input_rgb(self, R_filepath, G_filepath, B_filepath):
-        g = self.read_dcm(G_filepath, "L")
-        g_arr = self.to_tensor(g)
-
-        r = self.read_dcm(R_filepath, "L") if R_filepath is not None else None
-        r_arr = self.to_tensor(r) if r is not None else g_arr
-
-        b = self.read_dcm(B_filepath, "L") if B_filepath is not None else None
-        b_arr = self.to_tensor(b) if b is not None else g_arr
-
-        rgb = torch.cat([r_arr, g_arr, b_arr], dim=0)
-        return self.to_pil(rgb)
-
-    def _load_input_gray(self, R_filepath, G_filepath, B_filepath):
-        return self.read_dcm(G_filepath)
-
-    def load_input(self, R_filepath, G_filepath, B_filepath):
-        load_fn = getattr(self, f"_load_input_{self.mode}")
-        return load_fn(R_filepath, G_filepath, B_filepath)
-
     def __len__(self):
         return len(self.data)
 
@@ -316,3 +324,46 @@ class VocalTractMaskRCNNDataset(Dataset):
         }
 
         return info, img_arr, target_dict
+
+
+class DentalPhonemesDataset(Dataset, InputLoaderMixin):
+    def __init__(self, datadir, filepath, size=(224, 224), augmentation=None, mode="gray"):
+        if mode not in ("rgb", "gray"):
+            raise ValueError(f"Mode should be either 'rgb' or 'gray'")
+
+        self.datadir = datadir
+        self.mode = mode
+        self.df = pd.read_csv(filepath)
+
+        self.to_tensor = transforms.ToTensor()
+        self.resize = transforms.Resize(size)
+        self.augmentation = augmentation
+        self.normalize = transforms.Normalize(
+            mean=torch.tensor([0.485, 0.456, 0.406]),
+            std=torch.tensor([0.229, 0.224, 0.225])
+        )
+
+    def __len__(self):
+        return len(self.df)
+
+    def __getitem__(self, index):
+        item = self.df.iloc[index]
+
+        dcm_fpath = item["dcm_filepath"]
+        dcm_m1_fpath = item["dcm_m1_filepath"]
+        dcm_p1_fpath = item["dcm_p1_filepath"]
+
+        dcm_fpath = os.path.join(self.datadir, dcm_fpath)
+        dcm_m1_fpath = os.path.join(self.datadir, dcm_m1_fpath) if not pd.isna(dcm_m1_fpath) else None
+        dcm_p1_fpath = os.path.join(self.datadir, dcm_p1_fpath) if not pd.isna(dcm_p1_fpath) else None
+
+        img = self.load_input(dcm_m1_fpath, dcm_fpath, dcm_p1_fpath, mode=self.mode)
+
+        img_arr = self.to_tensor(self.resize(img))
+        img_arr = self.normalize(img_arr)
+        if self.augmentation is not None:
+            img_arr = self.augmentation(img_arr)
+
+        target = torch.tensor(item["target"], dtype=torch.long)
+
+        return item["dcm_filepath"], img_arr, target

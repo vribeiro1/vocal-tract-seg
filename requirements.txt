@@ -3,6 +3,7 @@ kornia
 numba
 numpy
 opencv-python
+pandas
 Pillow
 PyYAML
 pydicom
