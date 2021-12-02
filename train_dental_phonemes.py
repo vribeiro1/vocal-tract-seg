@@ -8,6 +8,7 @@ import torch.nn as nn
 
 from sacred import Experiment
 from sacred.observers import FileStorageObserver
+from sklearn.metrics import roc_auc_score
 from tensorboardX import SummaryWriter
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
@@ -35,6 +36,8 @@ def run_epoch(phase, epoch, model, dataloader, optimizer, criterion, writer=None
     else:
         model.eval()
 
+    final_targets = []
+    final_outputs = []
     losses = []
     progress_bar = tqdm(dataloader, desc=f"Epoch {epoch} - {phase}")
     for _, inputs, targets in progress_bar:
@@ -52,15 +55,24 @@ def run_epoch(phase, epoch, model, dataloader, optimizer, criterion, writer=None
 
         losses.append(loss.item())
         mean_loss = np.mean(losses)
-        progress_bar.set_postfix(loss=mean_loss)
+        final_targets.extend([t.item() for t in targets])
+        final_outputs.extend([o.item() for o in outputs[:, 1]])
+        roc_auc = roc_auc_score(final_targets, final_outputs)
+        progress_bar.set_postfix(loss=mean_loss, roc_auc=roc_auc)
+
+    roc_auc = roc_auc_score(final_targets, final_outputs)
+    roc_auc_tag = f"{phase}/roc_auc"
 
     mean_loss = np.mean(losses)
     loss_tag = f"{phase}/loss"
+
     if writer is not None:
         writer.add_scalar(loss_tag, mean_loss, epoch)
+        writer.add_scalar(roc_auc_tag, roc_auc, epoch)
 
     info = {
-        "loss": mean_loss
+        "loss": mean_loss,
+        "roc_auc": roc_auc
     }
 
     return info
@@ -72,6 +84,8 @@ def run_test(epoch, model, dataloader, criterion, device, save_filepath=None):
 
     model.eval()
 
+    final_targets = []
+    final_outputs = []
     losses = []
     results = []
     progress_bar = tqdm(dataloader, desc=f"Epoch {epoch} - test")
@@ -85,7 +99,10 @@ def run_test(epoch, model, dataloader, criterion, device, save_filepath=None):
 
         losses.append(loss.item())
         mean_loss = np.mean(losses)
-        progress_bar.set_postfix(loss=mean_loss)
+        final_targets.extend([t.item() for t in targets])
+        final_outputs.extend([o.item() for o in outputs[:, 1]])
+        roc_auc = roc_auc_score(final_targets, final_outputs)
+        progress_bar.set_postfix(loss=mean_loss, roc_auc=roc_auc)
 
         outputs = torch.softmax(outputs, dim=1)
         results.extend([
@@ -100,9 +117,12 @@ def run_test(epoch, model, dataloader, criterion, device, save_filepath=None):
         df = pd.DataFrame(results)
         df.to_csv(save_filepath, index=False)
 
+    roc_auc = roc_auc_score(final_targets, final_outputs)
     mean_loss = np.mean(losses)
+
     info = {
-        "loss": mean_loss
+        "loss": mean_loss,
+        "roc_auc": roc_auc
     }
 
     return info, results
@@ -115,6 +135,7 @@ def main(
     mode="gray", state_dict_fpath=None
 ):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Running on '{device.type}'")
 
     writer = SummaryWriter(os.path.join(fs_observer.dir, f"experiment-{_run._id}"))
     best_model_path = os.path.join(fs_observer.dir, "best_model.pt")
@@ -168,7 +189,7 @@ def main(
     )
 
     epochs = range(1, n_epochs + 1)
-    best_metric = np.inf
+    best_metric = 0
     epochs_since_best = 0
 
     for epoch in epochs:
@@ -196,8 +217,8 @@ def main(
 
         scheduler.step(info_valid["loss"])
 
-        if info_valid["loss"] < best_metric:
-            best_metric = info_valid["loss"]
+        if info_valid["roc_auc"] > best_metric:
+            best_metric = info_valid["roc_auc"]
             torch.save(model.state_dict(), best_model_path)
             epochs_since_best = 0
         else:
