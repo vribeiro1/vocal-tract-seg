@@ -11,8 +11,9 @@ from copy import deepcopy
 from glob import glob
 from PIL import Image
 from torch.utils.data import DataLoader
-from torchvision.models.detection.mask_rcnn import maskrcnn_resnet50_fpn
 from tqdm import tqdm
+from vt_tracker import border_segmentation
+from vt_tracker.postprocessing import POST_PROCESSING, dental_articulation
 from vt_tracker.postprocessing.calculate_contours import calculate_contour
 
 from bs_regularization import regularize_Bsplines
@@ -30,7 +31,6 @@ class InferenceVocalTractMaskRCNNDataset(VocalTractMaskRCNNDataset):
             images = sorted(glob(os.path.join(datadir, subject, sequence, "dicoms", "*.dcm")))
 
             for image_filepath in images:
-                image_dirname = os.path.dirname(os.path.dirname(image_filepath))
                 image_name = os.path.basename(image_filepath).rsplit(".", maxsplit=1)[0]
                 instance_number = int(image_name)
 
@@ -69,7 +69,8 @@ class InferenceVocalTractMaskRCNNDataset(VocalTractMaskRCNNDataset):
         img = self.load_input(
             data_item["dcm_m1_filepath"],
             dcm_fpath,
-            data_item["dcm_p1_filepath"]
+            data_item["dcm_p1_filepath"],
+            self.mode
         )
 
         img_arr = self.to_tensor(self.resize(img))
@@ -88,7 +89,7 @@ class InferenceVocalTractMaskRCNNDataset(VocalTractMaskRCNNDataset):
         return info, img_arr, {}
 
 
-def run_inference(model, dataloader, outputs_dir, class_map, threshold=None, device=None):
+def run_border_segmentation_inference(model, dataloader, outputs_dir, class_map, threshold=None, device=None):
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -99,7 +100,7 @@ def run_inference(model, dataloader, outputs_dir, class_map, threshold=None, dev
     progress_bar = tqdm(dataloader, desc=f"Inference")
 
     return_outputs = []
-    for i, (info, inputs, _) in enumerate(progress_bar):
+    for info, inputs, _ in progress_bar:
         inputs = inputs.to(device)
 
         with torch.set_grad_enabled(False):
@@ -221,22 +222,22 @@ def load_articulator_array(filepath):
     return target_array.copy()
 
 
-def process_out(out, datadir, save_to):
-    subject = out["subject"]
-    sequence = out["sequence"]
-    instance_number = out["instance_number"]
-    pred_class = out["pred_cls"]
+def process_out(output_item, datadir, save_to):
+    subject = output_item["subject"]
+    sequence = output_item["sequence"]
+    instance_number = output_item["instance_number"]
+    pred_class = output_item["pred_cls"]
 
     outputs_dir = os.path.join(save_to, "inference_contours", subject, sequence)
     if not os.path.exists(outputs_dir):
         os.makedirs(outputs_dir)
 
-    if "mask_filepath" in out:
-        mask_filepath = out["mask_filepath"]
+    if "mask_filepath" in output_item:
+        mask_filepath = output_item["mask_filepath"]
         mask_img = Image.open(mask_filepath).convert("L")
         mask = np.array(mask_img) / 255.
     else:
-        mask = out["mask"]
+        mask = output_item["mask"]
 
     gravity_curve_filepath = os.path.join(
         datadir,
@@ -251,14 +252,19 @@ def process_out(out, datadir, save_to):
     else:
         gravity_curve = None
 
-    contour = calculate_contour(pred_class, mask, gravity_curve=gravity_curve)
+    cfg = deepcopy(POST_PROCESSING[pred_class])
+    if pred_class == TONGUE and not output_item["is_dental"]:
+        # Deactivate gravity algorithm for non-dental articulations
+        cfg["G"] = 0
+        cfg["delta"] = 0
+
+    contour = calculate_contour(pred_class, mask, gravity_curve=gravity_curve, cfg=cfg)
     if len(contour) > 0:
         contour = smooth_contour(contour)
 
         npy_filepath = os.path.join(outputs_dir, f"{'%04d' % instance_number}_{pred_class}.npy")
         with open(npy_filepath, "wb") as f:
             np.save(f, contour)
-
 
 def main(cfg):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -284,26 +290,45 @@ def main(cfg):
     if not os.path.exists(cfg["save_to"]):
         os.mkdir(cfg["save_to"])
 
+    densenet = dental_articulation.load_model(device.type)
+    progress_bar = tqdm(dataloader, desc=f"Dental articulation")
+
+    make_key = lambda d: "_".join([
+        d["subject"],
+        d["sequence"],
+        "%04d" % d["instance_number"]
+    ])
+
+    is_dental_map = {}
+    for batch_info, batch_inputs, _ in progress_bar:
+        batch_outputs = dental_articulation.discriminate_dental_articulations(
+            batch_inputs, device=device.type, model=densenet
+        )
+        for info, output in zip(batch_info, batch_outputs):
+            is_dental = bool(output.item())
+            is_dental_map[make_key(info)] = is_dental
+
     if inference_directory is None:
-        model = maskrcnn_resnet50_fpn(pretrained=True)
-        if cfg["state_dict_fpath"] is not None:
-            state_dict = torch.load(cfg["state_dict_fpath"], map_location=device)
-            model.load_state_dict(state_dict)
-        model.to(device)
+        state_dict = cfg.get("state_dict_fpath")
+        mask_rcnn = border_segmentation.load_model(device.type, state_dict_filepath=state_dict)
 
         class_map = {i: c for c, i in dataset.classes_dict.items()}
-        outputs = run_inference(
-            model=model,
+        border_seg_outputs = run_border_segmentation_inference(
+            model=mask_rcnn,
             dataloader=dataloader,
             device=device,
             class_map=class_map,
             outputs_dir=os.path.join(cfg["save_to"], "inference")
         )
     else:
-        outputs = load_outputs_from_directory(inference_directory, cfg["sequences"], cfg["classes"])
+        border_seg_outputs = load_outputs_from_directory(
+            inference_directory, cfg["sequences"], cfg["classes"]
+        )
 
-    for out in tqdm(outputs, desc="Calculating contours"):
-        process_out(out, cfg["datadir"], cfg["save_to"])
+    for output_item in tqdm(border_seg_outputs, desc="Calculating contours"):
+        is_dental = is_dental_map[make_key(output_item)]
+        output_item["is_dental"] = is_dental_map[make_key(output_item)]
+        process_out(output_item, cfg["datadir"], cfg["save_to"])
 
 
 if __name__ == "__main__":
