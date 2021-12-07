@@ -13,7 +13,7 @@ from scipy import interpolate
 from skimage.measure import regionprops
 from torch.utils.data import Dataset
 from torchvision import transforms
-from vt_tracker.helpers import uint16_to_uint8
+from vt_tracker.visualization import uint16_to_uint8
 
 from read_roi import read_roi_zip
 
@@ -284,7 +284,8 @@ class VocalTractMaskRCNNDataset(Dataset, InputLoaderMixin):
         img = self.load_input(
             data_item["dcm_m1_filepath"],
             dcm_fpath,
-            data_item["dcm_p1_filepath"]
+            data_item["dcm_p1_filepath"],
+            mode=self.mode
         )
 
         img_arr = self.to_tensor(self.resize(img))

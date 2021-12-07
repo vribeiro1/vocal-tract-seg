@@ -77,7 +77,7 @@ def run_epoch(phase, epoch, model, dataloader, optimizer, writer=None, device=No
 
 
 @ex.automain
-def main(_run, datadir, batch_size, n_epochs, patience, learning_rate,
+def main(_run, datadir, batch_size, n_epochs, patience, learning_rate, weight_decay,
          train_sequences, valid_sequences, test_sequences, classes, size, mode,
          state_dict_fpath=None):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -96,7 +96,7 @@ def main(_run, datadir, batch_size, n_epochs, patience, learning_rate,
         model.load_state_dict(state_dict)
     model.to(device)
 
-    optimizer = Adam(model.parameters(), lr=learning_rate)
+    optimizer = Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
     scheduler = ReduceLROnPlateau(optimizer, factor=0.1, patience=10)
 
     augmentations = MultiCompose([
