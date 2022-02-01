@@ -12,11 +12,11 @@ from glob import glob
 from PIL import Image
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+from vt_tools.bs_regularization import regularize_Bsplines
 from vt_tracker import border_segmentation
 from vt_tracker.postprocessing import POST_PROCESSING, dental_articulation
 from vt_tracker.postprocessing.calculate_contours import calculate_contour
 
-from bs_regularization import regularize_Bsplines
 from dataset import VocalTractMaskRCNNDataset
 from helpers import set_seeds
 from settings import *

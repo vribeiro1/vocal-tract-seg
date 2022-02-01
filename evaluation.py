@@ -10,8 +10,8 @@ from PIL import Image, ImageDraw
 from scipy.ndimage.morphology import binary_fill_holes
 from skimage.morphology import skeletonize
 from tqdm import tqdm
-from vt_tracker import EPIGLOTTIS, SOFT_PALATE
-from vt_tracker.metrics import p2cp_mean
+from vt_tools import EPIGLOTTIS, SOFT_PALATE
+from vt_tools.metrics import p2cp_mean
 from vt_tracker.postprocessing.calculate_contours import calculate_contour
 
 from connect_points.active_contours import get_soft_palate_extremities

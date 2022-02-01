@@ -5,8 +5,7 @@ import yaml
 
 from argparse import ArgumentParser
 from tqdm import tqdm
-
-from bs_regularization import regularize_Bsplines
+from vt_tools.bs_regularization import regularize_Bsplines
 
 
 def track_arytenoid_muscle(pharynx, vocal_folds):
