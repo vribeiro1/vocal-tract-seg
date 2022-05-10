@@ -29,4 +29,3 @@ ujson
 -e ../vt_tools
 # Clone the repo 'https://gitlab.inria.fr/vsouzari/vt_tracker.git' and install from local
 -e ../vt_tracker
--e ../glow_tts

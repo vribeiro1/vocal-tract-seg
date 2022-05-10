@@ -73,7 +73,7 @@ def evaluate_model(targets, contours):
     return mean, sigma, median
 
 
-def run_test(epoch, model, dataloader, outputs_dir, class_map, threshold=None, device=None):
+def run_maskrcnn_test(epoch, model, dataloader, outputs_dir, class_map, threshold=None, device=None):
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -120,7 +120,6 @@ def run_test(epoch, model, dataloader, outputs_dir, class_map, threshold=None, d
                     mask_arr = mask_arr.astype(np.uint8)
 
                     mask_img = Image.fromarray(mask_arr)
-                    # mask_img = draw_bbox(mask_img, box, "%.4f" % score)
 
                     mask_dirname = os.path.join(
                         epoch_outputs_dir,
@@ -146,6 +145,72 @@ def run_test(epoch, model, dataloader, outputs_dir, class_map, threshold=None, d
                         "mask": mask.squeeze(dim=0).cpu().numpy(),
                         "target": target.squeeze(dim=0).cpu().numpy()
                     })
+                    return_outputs.append(im_outputs_with_info)
+
+    return return_outputs
+
+
+def run_deeplabv3_test(epoch, model, dataloader, outputs_dir, class_map, threshold=None, device=None):
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    epoch_outputs_dir = os.path.join(outputs_dir, "inference", str(epoch))
+    if not os.path.exists(epoch_outputs_dir):
+        os.makedirs(epoch_outputs_dir)
+
+    model.eval()
+    progress_bar = tqdm(dataloader, desc=f"Epoch {epoch} - inference")
+
+    return_outputs = []
+    for _, (info, inputs, targets) in enumerate(progress_bar):
+        inputs = inputs.to(device)
+        targets = targets.to(device)
+
+        with torch.set_grad_enabled(False):
+            outputs = model(inputs)["out"]
+            outputs = torch.sigmoid(outputs)
+
+            for _, (im_info, im_outputs, im_targets) in enumerate(zip(info, outputs, targets)):
+                # detected: List of (bbox, label, score, output_mask, target_mask)
+                detected = [(
+                    (0, 0, 0, 0), label, 1.0, im_outputs[label], im_targets[label]
+                ) for label, _ in class_map.items()]
+
+                for box, label, score, mask, target in detected:
+                    mask_arr = mask.squeeze(dim=0).cpu().numpy()
+                    if threshold is not None:
+                        mask_arr[mask_arr > threshold] = 1.
+                        mask_arr[mask_arr <= threshold] = 0.
+                    mask_arr = mask_arr * 255
+                    mask_arr = mask_arr.astype(np.uint8)
+
+                    mask_img = Image.fromarray(mask_arr)
+
+                    mask_dirname = os.path.join(
+                        epoch_outputs_dir,
+                        im_info["subject"],
+                        im_info["sequence"]
+                    )
+                    if not os.path.exists(mask_dirname):
+                        os.makedirs(mask_dirname)
+
+                    pred_cls = class_map[label]
+                    mask_filepath = os.path.join(
+                        mask_dirname,
+                        f"{'%04d' % im_info['instance_number']}_{pred_cls}.png"
+                    )
+                    mask_img.save(mask_filepath)
+
+                    im_outputs_with_info = deepcopy(im_info)
+                    im_outputs_with_info.update({
+                        "box": list(box),
+                        "label": label,
+                        "pred_cls": pred_cls,
+                        "score": score,
+                        "mask": mask.squeeze(dim=0).cpu().numpy(),
+                        "target": target.squeeze(dim=0).cpu().numpy()
+                    })
+
                     return_outputs.append(im_outputs_with_info)
 
     return return_outputs
@@ -222,3 +287,9 @@ def run_evaluation(outputs, classes, save_to=None, load_fn=None):
         results[cls_] = (cls_mean, cls_std, cls_median)
 
     return results
+
+
+test_runners = {
+    "maskrcnn": run_maskrcnn_test,
+    "deeplabv3": run_deeplabv3_test
+}

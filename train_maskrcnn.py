@@ -1,9 +1,10 @@
 import pdb
 
-import json
 import numpy as np
 import os
 import torch
+import torch.nn as nn
+import ujson
 
 from sacred import Experiment
 from sacred.observers import FileStorageObserver
@@ -12,11 +13,12 @@ from torch.optim import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader
 from torchvision.models.detection.mask_rcnn import maskrcnn_resnet50_fpn
+from torchvision.models.segmentation import deeplabv3_resnet101
 from tqdm import tqdm
 
 from augmentations import MultiCompose, MultiRandomRotation
 from dataset import VocalTractMaskRCNNDataset
-from evaluation import run_evaluation, run_test
+from evaluation import run_evaluation, test_runners
 from helpers import set_seeds
 from settings import *
 
@@ -25,7 +27,26 @@ fs_observer = FileStorageObserver.create(os.path.join(BASE_DIR, "results"))
 ex.observers.append(fs_observer)
 
 
-def run_epoch(phase, epoch, model, dataloader, optimizer, writer=None, device=None):
+def load_deeplabv3(pretrained, num_classes):
+    deeplabv3 = deeplabv3_resnet101(pretrained=pretrained)
+
+    deeplabv3.aux_classifier[-1] = nn.Conv2d(256, num_classes, kernel_size=(1, 1), stride=(1, 1))
+    deeplabv3.classifier[-1] = nn.Conv2d(256, num_classes, kernel_size=(1, 1), stride=(1, 1))
+
+    return deeplabv3
+
+
+def load_maskrcnn(pretrained, *args, **kwargs):
+    return maskrcnn_resnet50_fpn(pretrained=pretrained)
+
+
+model_loaders = {
+    "maskrcnn": load_maskrcnn,
+    "deeplabv3": load_deeplabv3
+}
+
+
+def run_maskrcnn_epoch(phase, epoch, model, dataloader, optimizer, *args, writer=None, device=None, **kwargs):
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     training = phase == TRAIN
@@ -76,10 +97,49 @@ def run_epoch(phase, epoch, model, dataloader, optimizer, writer=None, device=No
     return info
 
 
+def run_deeplabv3_epoch(phase, epoch, model, dataloader, optimizer, criterion, *args, writer=None, device=None, **kwargs):
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    training = phase == TRAIN
+
+    losses = []
+    model.train()
+    progress_bar = tqdm(dataloader, desc=f"Epoch {epoch} - {phase}")
+    for i, (_, inputs, targets) in enumerate(progress_bar):
+        inputs = inputs.to(device)
+        targets = targets.to(device)
+
+        optimizer.zero_grad()
+        with torch.set_grad_enabled(training):
+            outputs = model(inputs)["out"]
+            loss = criterion(outputs, targets)
+
+            if training:
+                loss.backward()
+                optimizer.step()
+
+        losses.append({"loss": loss.item()})
+        mean_loss = np.mean([l["loss"] for l in losses])
+        progress_bar.set_postfix(loss=mean_loss)
+
+    mean_loss = np.mean([l["loss"] for l in losses])
+    loss_tag = f"{phase}/loss"
+    if writer is not None:
+        writer.add_scalar(loss_tag, mean_loss, epoch)
+
+    info = {
+        "loss": mean_loss
+    }
+
+    return info
+
+
 @ex.automain
-def main(_run, datadir, batch_size, n_epochs, patience, learning_rate, weight_decay,
+def main(_run, model_name, datadir, batch_size, n_epochs, patience, learning_rate, weight_decay,
          train_sequences, valid_sequences, test_sequences, classes, size, mode,
          state_dict_fpath=None):
+    assert model_name in model_loaders.keys(), f"Unsuported model '{model_name}'"
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     writer = SummaryWriter(os.path.join(fs_observer.dir, f"experiment-{_run._id}"))
@@ -90,18 +150,22 @@ def main(_run, datadir, batch_size, n_epochs, patience, learning_rate, weight_de
     if not os.path.exists(outputs_dir):
         os.mkdir(outputs_dir)
 
-    model = maskrcnn_resnet50_fpn(pretrained=True)
+    num_classes = len(classes) + 1  # Number of classes + the background
+    model = model_loaders[model_name](pretrained=True, num_classes=num_classes)
     if state_dict_fpath is not None:
         state_dict = torch.load(state_dict_fpath, map_location=device)
         model.load_state_dict(state_dict)
     model.to(device)
 
     optimizer = Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+    loss_fn = nn.BCEWithLogitsLoss()
     scheduler = ReduceLROnPlateau(optimizer, factor=0.1, patience=10)
 
     augmentations = MultiCompose([
         MultiRandomRotation([-5, 5]),
     ])
+
+    collate_fn = getattr(VocalTractMaskRCNNDataset, f"{model_name}_collate_fn")
 
     train_dataset = VocalTractMaskRCNNDataset(
         datadir,
@@ -116,7 +180,7 @@ def main(_run, datadir, batch_size, n_epochs, patience, learning_rate, weight_de
         batch_size=batch_size,
         shuffle=True,
         worker_init_fn=set_seeds,
-        collate_fn=train_dataset.collate_fn
+        collate_fn=collate_fn
     )
 
     valid_dataset = VocalTractMaskRCNNDataset(
@@ -131,7 +195,7 @@ def main(_run, datadir, batch_size, n_epochs, patience, learning_rate, weight_de
         batch_size=batch_size,
         shuffle=False,
         worker_init_fn=set_seeds,
-        collate_fn=valid_dataset.collate_fn
+        collate_fn=collate_fn
     )
 
     info = {}
@@ -139,6 +203,8 @@ def main(_run, datadir, batch_size, n_epochs, patience, learning_rate, weight_de
     best_metric = np.inf
     epochs_since_best = 0
 
+    run_epoch = run_maskrcnn_epoch if model_name == "maskrcnn" else run_deeplabv3_epoch
+    run_test = test_runners[model_name]
     for epoch in epochs:
         info[TRAIN] = run_epoch(
             phase=TRAIN,
@@ -146,6 +212,7 @@ def main(_run, datadir, batch_size, n_epochs, patience, learning_rate, weight_de
             model=model,
             dataloader=train_dataloader,
             optimizer=optimizer,
+            criterion=loss_fn,
             writer=writer,
             device=device
         )
@@ -156,6 +223,7 @@ def main(_run, datadir, batch_size, n_epochs, patience, learning_rate, weight_de
             model=model,
             dataloader=valid_dataloader,
             optimizer=optimizer,
+            criterion=loss_fn,
             writer=writer,
             device=device
         )
@@ -195,10 +263,10 @@ def main(_run, datadir, batch_size, n_epochs, patience, learning_rate, weight_de
         batch_size=batch_size,
         shuffle=False,
         worker_init_fn=set_seeds,
-        collate_fn=test_dataset.collate_fn
+        collate_fn=collate_fn
     )
 
-    best_model = maskrcnn_resnet50_fpn(pretrained=True)
+    best_model = model_loaders[model_name](pretrained=True, num_classes=num_classes)
     state_dict = torch.load(best_model_path, map_location=device)
     best_model.load_state_dict(state_dict)
     best_model.to(device)
@@ -225,4 +293,4 @@ def main(_run, datadir, batch_size, n_epochs, patience, learning_rate, weight_de
 
     test_results_filepath = os.path.join(fs_observer.dir, "test_results.json")
     with open(test_results_filepath, "w") as f:
-        json.dump(test_results, f)
+        ujson.dump(test_results, f)

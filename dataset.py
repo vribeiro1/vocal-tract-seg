@@ -4,16 +4,17 @@ import funcy
 import numpy as np
 import os
 import pandas as pd
-import pydicom
 import torch
 
 from glob import glob
 from PIL import Image
 from scipy import interpolate
 from skimage.measure import regionprops
+from scipy.ndimage import binary_fill_holes
 from torch.utils.data import Dataset
 from torchvision import transforms
-from vt_tracker.visualization import uint16_to_uint8
+from vt_tools import THYROID_CARTILAGE, VOCAL_FOLDS
+from vt_tracker.input import InputLoaderMixin
 
 from read_roi import read_roi_zip
 
@@ -21,42 +22,11 @@ MASK = "mask"
 ROI = "roi"
 
 
-class InputLoaderMixin:
-    @staticmethod
-    def read_dcm(dcm_fpath, mode="RGB"):
-        ds = pydicom.dcmread(dcm_fpath, force=True)
-        img = Image.fromarray(uint16_to_uint8(ds.pixel_array))
-
-        return img.convert(mode)
-
-    @staticmethod
-    def _load_input_rgb(R_filepath, G_filepath, B_filepath):
-        to_tensor = transforms.ToTensor()
-        to_pil = transforms.ToPILImage()
-
-        g = InputLoaderMixin.read_dcm(G_filepath, "L")
-        g_arr = to_tensor(g)
-
-        r = InputLoaderMixin.read_dcm(R_filepath, "L") if R_filepath is not None else None
-        r_arr = to_tensor(r) if r is not None else g_arr
-
-        b = InputLoaderMixin.read_dcm(B_filepath, "L") if B_filepath is not None else None
-        b_arr = to_tensor(b) if b is not None else g_arr
-
-        rgb = torch.cat([r_arr, g_arr, b_arr], dim=0)
-        return to_pil(rgb)
-
-    @staticmethod
-    def _load_input_gray(self, R_filepath, G_filepath, B_filepath):
-        return self.read_dcm(G_filepath)
-
-    @classmethod
-    def load_input(cls, R_filepath, G_filepath, B_filepath, mode):
-        load_fn = getattr(cls, f"_load_input_{mode}")
-        return load_fn(R_filepath, G_filepath, B_filepath)
-
-
 class VocalTractMaskRCNNDataset(Dataset, InputLoaderMixin):
+    closed_articulators = [
+        THYROID_CARTILAGE, VOCAL_FOLDS
+    ]
+
     def __init__(self, datadir, subj_sequences, classes, size=(224, 224), annotation=MASK, augmentations=None, mode="gray", allow_missing=False):
         if annotation not in (MASK, ROI):
             raise ValueError(f"Annotation level should be either '{MASK}' or '{ROI}'")
@@ -205,11 +175,21 @@ class VocalTractMaskRCNNDataset(Dataset, InputLoaderMixin):
         return target_arr
 
     @staticmethod
-    def collate_fn(batch):
+    def maskrcnn_collate_fn(batch):
         info = [b[0] for b in batch]
         inputs = torch.stack([b[1] for b in batch])
         targets = [b[2] for b in batch]
         return info, inputs, targets
+
+
+    @staticmethod
+    def deeplabv3_collate_fn(batch):
+        info = [b[0] for b in batch]
+        inputs = torch.stack([b[1] for b in batch])
+        targets = torch.stack([b[2]["masks"] for b in batch])
+
+        return info, inputs, targets
+
 
     @staticmethod
     def create_background_mask(masks):
@@ -250,6 +230,8 @@ class VocalTractMaskRCNNDataset(Dataset, InputLoaderMixin):
                 missing.append(i)
             else:
                 target_arr = self.roi_to_target_tensor(roi, original_size)
+                if art in self.closed_articulators:
+                    target_arr = binary_fill_holes(target_arr).astype(float)
                 target_arr = self.resize(target_arr)
             targets.append(target_arr)
 
