@@ -27,7 +27,10 @@ class VocalTractMaskRCNNDataset(Dataset, InputLoaderMixin):
         THYROID_CARTILAGE, VOCAL_FOLDS
     ]
 
-    def __init__(self, datadir, subj_sequences, classes, size=(224, 224), annotation=MASK, augmentations=None, mode="gray", allow_missing=False):
+    def __init__(
+        self, datadir, subj_sequences, classes, size=(224, 224), annotation=MASK, augmentations=None,
+        mode="gray", image_folder="dicoms", image_ext="dcm", allow_missing=False, include_bkg=True
+    ):
         if annotation not in (MASK, ROI):
             raise ValueError(f"Annotation level should be either '{MASK}' or '{ROI}'")
 
@@ -46,13 +49,22 @@ class VocalTractMaskRCNNDataset(Dataset, InputLoaderMixin):
 
             sequences.extend([(subj, seq) for seq in use_seqs])
 
-        self.data = self._collect_data(datadir, sequences, classes, annotation, allow_missing=allow_missing)
+        self.data = self._collect_data(
+            datadir=datadir,
+            sequences=sequences,
+            classes=classes,
+            annotation=annotation,
+            img_folder=image_folder,
+            img_ext=image_ext,
+            allow_missing=allow_missing
+        )
         if len(self.data) == 0:
             raise Exception("Empty VocalTractMaskRCNNDataset")
 
         self.mode = mode
+        self.include_bkg = include_bkg
         self.classes = sorted(classes)
-        self.classes_dict = {c: i + 1 for i, c in enumerate(self.classes)}
+        self.classes_dict = {c: i + int(include_bkg) for i, c in enumerate(self.classes)}
 
         self.to_tensor = transforms.ToTensor()
         self.normalize = transforms.Normalize(
@@ -65,11 +77,11 @@ class VocalTractMaskRCNNDataset(Dataset, InputLoaderMixin):
         self.augmentations = augmentations
 
     @staticmethod
-    def _collect_data(datadir, sequences, classes, annotation, allow_missing=False):
+    def _collect_data(datadir, sequences, classes, annotation, img_folder="dicoms", img_ext="dcm", allow_missing=False):
         data = []
 
         for subject, sequence in sequences:
-            images = glob(os.path.join(datadir, subject, sequence, "dicoms", "*.dcm"))
+            images = glob(os.path.join(datadir, subject, sequence, img_folder, f"*.{img_ext}"))
 
             for image_filepath in images:
                 image_dirname = os.path.dirname(os.path.dirname(image_filepath))
@@ -79,7 +91,7 @@ class VocalTractMaskRCNNDataset(Dataset, InputLoaderMixin):
                 instance_number_m1 = instance_number - 1
                 image_m1_filepath = os.path.join(
                     os.path.dirname(image_filepath),
-                    "%04d" % instance_number_m1 + ".dcm"
+                    "%04d" % instance_number_m1 + f".{img_ext}"
                 )
                 if not os.path.exists(image_m1_filepath):
                     image_m1_filepath = None
@@ -87,7 +99,7 @@ class VocalTractMaskRCNNDataset(Dataset, InputLoaderMixin):
                 instance_number_p1 = instance_number + 1
                 image_p1_filepath = os.path.join(
                     os.path.dirname(image_filepath),
-                    "%04d" % instance_number_p1 + ".dcm"
+                    "%04d" % instance_number_p1 + f".{img_ext}"
                 )
                 if not os.path.exists(image_p1_filepath):
                     image_p1_filepath = None
@@ -105,9 +117,9 @@ class VocalTractMaskRCNNDataset(Dataset, InputLoaderMixin):
                     "subject": subject,
                     "sequence": sequence,
                     "instance_number": instance_number,
-                    "dcm_m1_filepath": image_m1_filepath,
+                    "img_m1_filepath": image_m1_filepath,
                     "dcm_filepath": image_filepath,
-                    "dcm_p1_filepath": image_p1_filepath,
+                    "img_p1_filepath": image_p1_filepath,
                     "rois": rois,
                     "seg_masks": targets
                 }
@@ -157,10 +169,14 @@ class VocalTractMaskRCNNDataset(Dataset, InputLoaderMixin):
         return [item for item in iterable if not (item in seen or seen.add(item))]
 
     @staticmethod
-    def roi_to_target_tensor(roi, size):
+    def roi_to_target_tensor(roi, size, closed=False):
         points = VocalTractMaskRCNNDataset._remove_duplicates(zip(roi["x"], roi["y"]))
         x = funcy.lmap(lambda t: t[0], points)
         y = funcy.lmap(lambda t: t[1], points)
+
+        if closed:
+            x += [x[0]]
+            y += [y[0]]
 
         tck, _ = interpolate.splprep([x, y], s=0)
         unew = np.arange(0, 1, 0.001)
@@ -229,7 +245,7 @@ class VocalTractMaskRCNNDataset(Dataset, InputLoaderMixin):
                 target_arr = torch.zeros(self.resize.size)
                 missing.append(i)
             else:
-                target_arr = self.roi_to_target_tensor(roi, original_size)
+                target_arr = self.roi_to_target_tensor(roi, original_size, closed=art in self.closed_articulators)
                 if art in self.closed_articulators:
                     target_arr = binary_fill_holes(target_arr).astype(float)
                 target_arr = self.resize(target_arr)
@@ -264,9 +280,9 @@ class VocalTractMaskRCNNDataset(Dataset, InputLoaderMixin):
         data_item = self.data[item]
         dcm_fpath = data_item["dcm_filepath"]
         img = self.load_input(
-            data_item["dcm_m1_filepath"],
+            data_item["img_m1_filepath"],
             dcm_fpath,
-            data_item["dcm_p1_filepath"],
+            data_item["img_p1_filepath"],
             mode=self.mode
         )
 
@@ -283,15 +299,18 @@ class VocalTractMaskRCNNDataset(Dataset, InputLoaderMixin):
         if self.augmentations:
             img_arr, masks = self.augmentations(img_arr, masks)
 
-        h, w = self.resize.size
-        boxes = torch.stack(
-            [torch.tensor([0., 0., h, w])] +
-            [self.get_box_from_mask_tensor(mask, margin=3) for mask in masks]
-        )
-        labels = torch.tensor([0] + list(self.classes_dict.values()), dtype=torch.int64)
+        boxes = torch.stack([self.get_box_from_mask_tensor(mask, margin=3) for mask in masks])
+        labels = torch.tensor(list(self.classes_dict.values()), dtype=torch.int64)
 
-        background = self.create_background_mask(masks).unsqueeze(dim=0)
-        masks = torch.cat([background, masks])
+        if self.include_bkg:
+            h, w = self.resize.size
+            background_bbox = torch.tensor([0., 0., h, w]).unsqueeze(dim=0)
+            background_label = torch.tensor([0], dtype = torch.int64)
+            background_mask = self.create_background_mask(masks).unsqueeze(dim=0)
+
+            boxes = torch.cat([background_bbox, boxes])
+            labels = torch.cat([background_label, labels])
+            masks = torch.cat([background_mask, masks])
 
         target_dict = {
             "boxes": boxes,  # (FloatTensor[N, 4]): the coordinates of the N bounding boxes in [x0, y0, x1, y1] format, ranging from 0 to W and 0 to H.
@@ -303,7 +322,7 @@ class VocalTractMaskRCNNDataset(Dataset, InputLoaderMixin):
             "subject": data_item["subject"],
             "sequence": data_item["sequence"],
             "instance_number": data_item["instance_number"],
-            "dcm_filepath": dcm_fpath
+            "img_filepath": dcm_fpath
         }
 
         return info, img_arr, target_dict
@@ -332,9 +351,9 @@ class DentalPhonemesDataset(Dataset, InputLoaderMixin):
     def __getitem__(self, index):
         item = self.df.iloc[index]
 
-        dcm_fpath = item["dcm_filepath"]
-        dcm_m1_fpath = item["dcm_m1_filepath"]
-        dcm_p1_fpath = item["dcm_p1_filepath"]
+        dcm_fpath = item["img_filepath"]
+        dcm_m1_fpath = item["img_m1_filepath"]
+        dcm_p1_fpath = item["img_p1_filepath"]
 
         dcm_fpath = os.path.join(self.datadir, dcm_fpath)
         dcm_m1_fpath = os.path.join(self.datadir, dcm_m1_fpath) if not pd.isna(dcm_m1_fpath) else None
@@ -349,4 +368,4 @@ class DentalPhonemesDataset(Dataset, InputLoaderMixin):
 
         target = torch.tensor(item["target"], dtype=torch.long)
 
-        return item["dcm_filepath"], img_arr, target
+        return item["img_filepath"], img_arr, target
