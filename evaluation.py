@@ -58,10 +58,10 @@ def evaluate_model(targets, contours):
     p2cps = []
     for target, predicted in zip(targets, contours):
         x_targets, y_targets = np.where(target == 255)
-        target_points = list(zip(x_targets, y_targets))
+        target_points = np.array(list(zip(x_targets, y_targets)))
 
         x_preds, y_preds = np.where(predicted == 255)
-        preds_points = list(zip(x_preds, y_preds))
+        preds_points = np.array(list(zip(x_preds, y_preds)))
 
         mean_p2cp = p2cp_mean(target_points, preds_points)
         p2cps.append(mean_p2cp)
@@ -257,7 +257,7 @@ def run_evaluation(outputs, classes, save_to=None, load_fn=None):
             if not os.path.exists(outputs_dir):
                 os.makedirs(outputs_dir)
 
-            img = load_fn(out["dcm_filepath"])
+            img = load_fn(out["img_filepath"])
             img_filepath = os.path.join(
                 outputs_dir,
                 f"{'%04d' % out['instance_number']}_{pred_class}.png"

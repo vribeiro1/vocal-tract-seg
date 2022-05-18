@@ -20,6 +20,7 @@ from augmentations import MultiCompose, MultiRandomRotation
 from dataset import VocalTractMaskRCNNDataset
 from evaluation import run_evaluation, test_runners
 from helpers import set_seeds
+from loss import SoftJaccardBCEWithLogitsLoss
 from settings import *
 
 ex = Experiment()
@@ -137,7 +138,7 @@ def run_deeplabv3_epoch(phase, epoch, model, dataloader, optimizer, criterion, *
 @ex.automain
 def main(_run, model_name, datadir, batch_size, n_epochs, patience, learning_rate, weight_decay,
          train_sequences, valid_sequences, test_sequences, classes, size, mode,
-         state_dict_fpath=None):
+         image_folder, image_ext, state_dict_fpath=None):
     assert model_name in model_loaders.keys(), f"Unsuported model '{model_name}'"
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -150,7 +151,7 @@ def main(_run, model_name, datadir, batch_size, n_epochs, patience, learning_rat
     if not os.path.exists(outputs_dir):
         os.mkdir(outputs_dir)
 
-    num_classes = len(classes) + 1  # Number of classes + the background
+    num_classes = len(classes)
     model = model_loaders[model_name](pretrained=True, num_classes=num_classes)
     if state_dict_fpath is not None:
         state_dict = torch.load(state_dict_fpath, map_location=device)
@@ -158,8 +159,10 @@ def main(_run, model_name, datadir, batch_size, n_epochs, patience, learning_rat
     model.to(device)
 
     optimizer = Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
-    loss_fn = nn.BCEWithLogitsLoss()
     scheduler = ReduceLROnPlateau(optimizer, factor=0.1, patience=10)
+
+    # The loss function will be ignored in the case of maskrcnn
+    loss_fn = SoftJaccardBCEWithLogitsLoss(jaccard_weight=8)
 
     augmentations = MultiCompose([
         MultiRandomRotation([-5, 5]),
@@ -173,7 +176,10 @@ def main(_run, model_name, datadir, batch_size, n_epochs, patience, learning_rat
         classes,
         size=size,
         augmentations=augmentations,
-        mode=mode
+        mode=mode,
+        image_folder=image_folder,
+        image_ext=image_ext,
+        include_bkg=(model_name == "maskrcnn")
     )
     train_dataloader = DataLoader(
         train_dataset,
@@ -188,7 +194,10 @@ def main(_run, model_name, datadir, batch_size, n_epochs, patience, learning_rat
         valid_sequences,
         classes,
         size=size,
-        mode=mode
+        mode=mode,
+        image_folder=image_folder,
+        image_ext=image_ext,
+        include_bkg=(model_name == "maskrcnn")
     )
     valid_dataloader = DataLoader(
         valid_dataset,
@@ -256,7 +265,10 @@ def main(_run, model_name, datadir, batch_size, n_epochs, patience, learning_rat
         test_sequences,
         classes,
         size=size,
-        mode=mode
+        mode=mode,
+        image_folder=image_folder,
+        image_ext=image_ext,
+        include_bkg=(model_name == "maskrcnn")
     )
     test_dataloader = DataLoader(
         test_dataset,
