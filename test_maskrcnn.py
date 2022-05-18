@@ -10,29 +10,35 @@ from torch.utils.data import DataLoader
 from torchvision.models.detection.mask_rcnn import maskrcnn_resnet50_fpn
 
 from dataset import VocalTractMaskRCNNDataset
-from evaluation import run_evaluation, run_test
+from evaluation import run_evaluation, test_runners
 from helpers import set_seeds
 from settings import *
 
 
 def main(cfg):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    num_classes = len(cfg["classes"])
+
+    model_name = cfg["model_name"]
+    image_folder = cfg["image_folder"]
+    image_ext = cfg["image_ext"]
 
     dataset = VocalTractMaskRCNNDataset(
         cfg["datadir"],
         cfg["sequences"],
         cfg["classes"],
         size=cfg["size"],
-        mode=cfg["mode"]
+        mode=cfg["mode"],
+        image_folder=image_folder,
+        image_ext=image_ext
     )
 
+    collate_fn = getattr(VocalTractMaskRCNNDataset, f"{model_name}_collate_fn")
     dataloader = DataLoader(
         dataset,
         batch_size=cfg["batch_size"],
         shuffle=False,
         worker_init_fn=set_seeds,
-        collate_fn=dataset.collate_fn
+        collate_fn=collate_fn
     )
 
     model = maskrcnn_resnet50_fpn(pretrained=True)
@@ -45,6 +51,7 @@ def main(cfg):
         os.mkdir(cfg["save_to"])
 
     class_map = {i: c for c, i in dataset.classes_dict.items()}
+    run_test = test_runners[model_name]
     outputs = run_test(
         epoch=0,
         model=model,
@@ -54,11 +61,12 @@ def main(cfg):
         outputs_dir=os.path.join(cfg["save_to"], "test_outputs")
     )
 
+    read_fn = getattr(VocalTractMaskRCNNDataset, f"read_{image_ext}")
     results = run_evaluation(
         outputs,
         dataset.classes,
         os.path.join(cfg["save_to"], "test_outputs"),
-        lambda fp: dataset.resize(dataset.read_dcm(fp))
+        lambda fp: dataset.resize(read_fn(fp))
     )
 
     results_filepath = os.path.join(cfg["save_to"], "test_results.json")
