@@ -1,13 +1,14 @@
 funcy
 kornia
 numba
-numpy
+numpy==1.21.*
 opencv-python
 pandas
 Pillow
 PyYAML
 pydicom
 pymongo
+roifile
 sacred
 scikit-learn
 scikit-image==0.18.1

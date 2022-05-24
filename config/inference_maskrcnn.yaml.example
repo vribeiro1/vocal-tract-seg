@@ -1,0 +1,21 @@
+datadir: /path/to/data
+inference_dir: /path/to/inference/masks  # optional
+save_to: /path/to/save/inference
+state_dict_fpath: /path/to/maskrcnn.pt  # required when inference_dir is empty
+batch_size: 2
+mode: rgb or gray
+size: [136, 136]
+sequences:
+    subject_id:
+        - sequence_id
+        - sequence_id
+classes:
+    - arytenoid-muscle
+    - epiglottis
+    - lower-lip
+    - pharynx
+    - soft-palate-midline
+    - thyroid-cartilage
+    - tongue
+    - upper-lip
+    - vocal-folds
