@@ -1,5 +1,3 @@
-import pdb
-
 import funcy
 import numpy as np
 import os
@@ -7,14 +5,10 @@ import torch
 
 from copy import deepcopy
 from PIL import Image, ImageDraw
-from scipy.ndimage.morphology import binary_fill_holes
-from skimage.morphology import skeletonize
 from tqdm import tqdm
-from vt_tools import EPIGLOTTIS, SOFT_PALATE
 from vt_tools.metrics import p2cp_mean
 from vt_tracker.postprocessing.calculate_contours import calculate_contour
 
-from connect_points.active_contours import get_soft_palate_extremities
 from helpers import draw_contour
 
 
@@ -216,20 +210,6 @@ def run_deeplabv3_test(epoch, model, dataloader, outputs_dir, class_map, thresho
     return return_outputs
 
 
-def soft_palate_mask_to_center_line(mask_):
-    mask = mask_.copy()
-
-    ext1, ext2, ext3 = get_soft_palate_extremities(mask)
-    x1, y1 = ext1
-    x2, y2 = ext2
-
-    mask[y2:y1+1, x1] = mask.max()
-    filled_mask = binary_fill_holes(mask).astype(np.uint8)
-    center_line = skeletonize(filled_mask) * 255
-
-    return center_line
-
-
 def run_evaluation(outputs, classes, save_to=None, load_fn=None):
     pred_classes = []
     targets = []
@@ -239,11 +219,7 @@ def run_evaluation(outputs, classes, save_to=None, load_fn=None):
         mask = out["mask"]
         pred_class = out["pred_cls"]
 
-        if pred_class in [EPIGLOTTIS, SOFT_PALATE]:
-            target = soft_palate_mask_to_center_line(target)
-
         contour = calculate_contour(pred_class, mask)
-
         zeros = np.zeros_like(mask)
         clean_contour = draw_contour(zeros, contour, color=(255, 255, 255))
 
@@ -276,15 +252,15 @@ def run_evaluation(outputs, classes, save_to=None, load_fn=None):
         pred_classes.append(pred_class)
 
     results = {}
-    zipped = list(zip(pred_classes, targets, contours))
-    for cls_ in classes:
-        filtered = funcy.lfilter(lambda t: t[0] == cls_, zipped)
+    # zipped = list(zip(pred_classes, targets, contours))
+    # for cls_ in classes:
+    #     filtered = funcy.lfilter(lambda t: t[0] == cls_, zipped)
 
-        cls_targets = [t[1] for t in filtered]
-        cls_contours = [t[2] for t in filtered]
-        cls_mean, cls_std, cls_median = evaluate_model(cls_targets, cls_contours)
+    #     cls_targets = [t[1] for t in filtered]
+    #     cls_contours = [t[2] for t in filtered]
+    #     cls_mean, cls_std, cls_median = evaluate_model(cls_targets, cls_contours)
 
-        results[cls_] = (cls_mean, cls_std, cls_median)
+    #     results[cls_] = (cls_mean, cls_std, cls_median)
 
     return results
 
