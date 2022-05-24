@@ -1,3 +1,4 @@
+import logging
 import pdb
 
 import numpy as np
@@ -10,7 +11,7 @@ from sacred import Experiment
 from sacred.observers import FileStorageObserver
 from tensorboardX import SummaryWriter
 from torch.optim import Adam
-from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.optim.lr_scheduler import ReduceLROnPlateau, CyclicLR
 from torch.utils.data import DataLoader
 from torchvision.models.detection.mask_rcnn import maskrcnn_resnet50_fpn
 from torchvision.models.segmentation import deeplabv3_resnet101
@@ -47,7 +48,7 @@ model_loaders = {
 }
 
 
-def run_maskrcnn_epoch(phase, epoch, model, dataloader, optimizer, *args, writer=None, device=None, **kwargs):
+def run_maskrcnn_epoch(phase, epoch, model, dataloader, optimizer, *args, scheduler=None, writer=None, device=None, **kwargs):
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     training = phase == TRAIN
@@ -76,6 +77,9 @@ def run_maskrcnn_epoch(phase, epoch, model, dataloader, optimizer, *args, writer
                 loss.backward()
                 optimizer.step()
 
+                if scheduler is not None:
+                    scheduler.step()
+
         losses.append({
             "loss_classifier": outputs["loss_classifier"].item(),
             "loss_box_reg": outputs["loss_box_reg"].item(),
@@ -98,7 +102,7 @@ def run_maskrcnn_epoch(phase, epoch, model, dataloader, optimizer, *args, writer
     return info
 
 
-def run_deeplabv3_epoch(phase, epoch, model, dataloader, optimizer, criterion, *args, writer=None, device=None, **kwargs):
+def run_deeplabv3_epoch(phase, epoch, model, dataloader, optimizer, criterion, *args, scheduler=None, writer=None, device=None, **kwargs):
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     training = phase == TRAIN
@@ -138,10 +142,11 @@ def run_deeplabv3_epoch(phase, epoch, model, dataloader, optimizer, criterion, *
 @ex.automain
 def main(_run, model_name, datadir, batch_size, n_epochs, patience, learning_rate, weight_decay,
          train_sequences, valid_sequences, test_sequences, classes, size, mode,
-         image_folder, image_ext, state_dict_fpath=None):
+         image_folder, image_ext, scheduler_type, state_dict_fpath=None):
     assert model_name in model_loaders.keys(), f"Unsuported model '{model_name}'"
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    logging.info(f"Running on '{device.type}'")
 
     writer = SummaryWriter(os.path.join(fs_observer.dir, f"experiment-{_run._id}"))
     best_model_path = os.path.join(fs_observer.dir, "best_model.pth")
@@ -159,7 +164,15 @@ def main(_run, model_name, datadir, batch_size, n_epochs, patience, learning_rat
     model.to(device)
 
     optimizer = Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
-    scheduler = ReduceLROnPlateau(optimizer, factor=0.1, patience=10)
+
+    if scheduler_type == "reduce_on_plateu":
+        scheduler = ReduceLROnPlateau(optimizer, factor=0.1, patience=10)
+    elif scheduler_type == "cyclic_lr":
+        base_lr = learning_rate / 50
+        max_lr = learning_rate
+        scheduler = CyclicLR(optimizer, base_lr=base_lr, max_lr=max_lr, cycle_momentum=False)
+    else:
+        logging.info(f"Unrecognized scheduler '{scheduler_type}'. No scheduler will be used instead.")
 
     # The loss function will be ignored in the case of maskrcnn
     loss_fn = SoftJaccardBCEWithLogitsLoss(jaccard_weight=8)
@@ -221,6 +234,7 @@ def main(_run, model_name, datadir, batch_size, n_epochs, patience, learning_rat
             model=model,
             dataloader=train_dataloader,
             optimizer=optimizer,
+            scheduler=scheduler if scheduler_type == "cyclic_lr" else None,
             criterion=loss_fn,
             writer=writer,
             device=device
@@ -232,12 +246,14 @@ def main(_run, model_name, datadir, batch_size, n_epochs, patience, learning_rat
             model=model,
             dataloader=valid_dataloader,
             optimizer=optimizer,
+            scheduler=scheduler if scheduler_type == "cyclic_lr" else None,
             criterion=loss_fn,
             writer=writer,
             device=device
         )
 
-        scheduler.step(info[VALID]["loss"])
+        if scheduler_type == "reduce_on_plateau":
+            scheduler.step(info[VALID]["loss"])
 
         if info[VALID]["loss"] < best_metric:
             best_metric = info[VALID]["loss"]
@@ -296,11 +312,12 @@ def main(_run, model_name, datadir, batch_size, n_epochs, patience, learning_rat
         outputs_dir=outputs_dir
     )
 
+    read_fn = getattr(VocalTractMaskRCNNDataset, f"read_{image_ext}")
     test_results = run_evaluation(
         outputs=test_outputs,
         classes=test_dataset.classes,
         save_to=outputs_dir,
-        load_fn=lambda fp: test_dataset.resize(test_dataset.read_dcm(fp))
+        load_fn=lambda fp: test_dataset.resize(read_fn(fp))
     )
 
     test_results_filepath = os.path.join(fs_observer.dir, "test_results.json")
