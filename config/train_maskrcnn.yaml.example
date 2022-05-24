@@ -6,27 +6,24 @@ patience: 50
 learning_rate: 0.0001
 size: [136, 136]
 train_sequences:
-    "1612": []
-    "1617": []
-    "1618": []
-    "1628": []
-    "1638": []
-    "1635": []
-    "1662": []
+    subject_id:
+        - sequence_id
+        - sequence_id
 valid_sequences:
-    "1640": []
+    subject_id:
+        - sequence_id
+        - sequence_id
 test_sequences:
-    "1653": []
-    "1659": []
-
+    subject_id:
+        - sequence_id
+        - sequence_id
 classes:
-    # - arytenoid-muscle
-    # - epiglottis
-    # - hyoid-bone
+    - arytenoid-muscle
+    - epiglottis
     - lower-lip
     - pharynx
     - soft-palate
-    # - thyroid-cartilage
+    - thyroid-cartilage
     - tongue
     - upper-lip
-    # - vocal-folds
+    - vocal-folds
