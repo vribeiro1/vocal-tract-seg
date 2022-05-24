@@ -15,6 +15,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau, CyclicLR
 from torch.utils.data import DataLoader
 from torchvision.models.detection.mask_rcnn import maskrcnn_resnet50_fpn
 from torchvision.models.segmentation import deeplabv3_resnet101
+from torchvision.transforms import Compose, GaussianBlur
 from tqdm import tqdm
 
 from augmentations import MultiCompose, MultiRandomRotation
@@ -177,7 +178,11 @@ def main(_run, model_name, datadir, batch_size, n_epochs, patience, learning_rat
     # The loss function will be ignored in the case of maskrcnn
     loss_fn = SoftJaccardBCEWithLogitsLoss(jaccard_weight=8)
 
-    augmentations = MultiCompose([
+    input_augmentations = Compose([
+        GaussianBlur(kernel_size=3)
+    ])
+
+    input_target_augmentations = MultiCompose([
         MultiRandomRotation([-5, 5]),
     ])
 
@@ -188,7 +193,8 @@ def main(_run, model_name, datadir, batch_size, n_epochs, patience, learning_rat
         train_sequences,
         classes,
         size=size,
-        augmentations=augmentations,
+        input_augs=input_augmentations,
+        input_target_augs=input_target_augmentations,
         mode=mode,
         image_folder=image_folder,
         image_ext=image_ext,

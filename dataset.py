@@ -28,7 +28,7 @@ class VocalTractMaskRCNNDataset(Dataset, InputLoaderMixin):
     ]
 
     def __init__(
-        self, datadir, subj_sequences, classes, size=(224, 224), annotation=MASK, augmentations=None,
+        self, datadir, subj_sequences, classes, size=(224, 224), annotation=MASK, input_augs=None, input_target_augs=None,
         mode="gray", image_folder="dicoms", image_ext="dcm", allow_missing=False, include_bkg=True
     ):
         if annotation not in (MASK, ROI):
@@ -74,7 +74,8 @@ class VocalTractMaskRCNNDataset(Dataset, InputLoaderMixin):
 
         self.annotation = annotation
         self.resize = transforms.Resize(size)
-        self.augmentations = augmentations
+        self.input_augs = input_augs
+        self.input_target_augs = input_target_augs
 
     @staticmethod
     def _collect_data(datadir, sequences, classes, annotation, img_folder="dicoms", img_ext="dcm", allow_missing=False):
@@ -296,8 +297,10 @@ class VocalTractMaskRCNNDataset(Dataset, InputLoaderMixin):
         masks[masks <= 0.5] = 0.0
 
         img_arr = self.normalize(img_arr)
-        if self.augmentations:
-            img_arr, masks = self.augmentations(img_arr, masks)
+        if self.input_augs:
+            img_arr = self.input_augs(img_arr)
+        if self.input_target_augs:
+            img_arr, masks = self.input_target_augs(img_arr, masks)
 
         boxes = torch.stack([self.get_box_from_mask_tensor(mask, margin=3) for mask in masks])
         labels = torch.tensor(list(self.classes_dict.values()), dtype=torch.int64)
