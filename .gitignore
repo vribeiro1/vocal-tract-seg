@@ -8,6 +8,8 @@
 *.png
 *.pdf
 *.txt
+*.stderr
+*.stdout
 
 .ipynb_checkpoints
 __pycache__

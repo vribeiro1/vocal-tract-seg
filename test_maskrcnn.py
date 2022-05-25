@@ -29,7 +29,8 @@ def main(cfg):
         size=cfg["size"],
         mode=cfg["mode"],
         image_folder=image_folder,
-        image_ext=image_ext
+        image_ext=image_ext,
+        include_bkg=(model_name == "maskrcnn")
     )
 
     collate_fn = getattr(VocalTractMaskRCNNDataset, f"{model_name}_collate_fn")
