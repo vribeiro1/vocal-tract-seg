@@ -6,10 +6,36 @@ import torch
 from copy import deepcopy
 from PIL import Image, ImageDraw
 from tqdm import tqdm
+from vt_tools.bs_regularization import regularize_Bsplines
 from vt_tools.metrics import p2cp_mean
 from vt_tracker.postprocessing.calculate_contours import calculate_contour
 
+from dataset import VocalTractMaskRCNNDataset
 from helpers import draw_contour
+
+
+def load_articulator_array(filepath, norm_value=None):
+    """
+    Loads the target array with the proper orientation (right to left)
+
+    Args:
+    filepath (str): Path to the articulator array
+    """
+    articul_array = np.load(filepath)
+    n_rows, _ = articul_array.shape
+    if n_rows == 2:
+        articul_array = articul_array.T
+
+    # All the countors should be oriented from right to left. If it is the opposite,
+    # we flip the array.
+    if articul_array[0][0] < articul_array[-1][0]:
+        articul_array = np.flip(articul_array, axis=0)
+
+    if norm_value is not None:
+        articul_array = articul_array.copy() / norm_value
+
+    return articul_array
+
 
 
 def save_image_with_contour(img, filepath, contour, target=None):
@@ -43,28 +69,41 @@ def draw_bbox(mask, bbox, text=None):
     return mask_img
 
 
-def evaluate_model(targets, contours):
-    """
-    Calculates the point-to-closest-point distance (in px) between two curves drawn in an image.
-    """
-    targets = np.squeeze(targets)
+def evaluate_model(pred_classes, target_filepaths, pred_filepaths):
+    results = []
+    for pred_class, target_filepath, pred_filepath in zip(pred_classes, target_filepaths, pred_filepaths):
+        target_array = load_articulator_array(target_filepath)
+        reg_x, reg_y = regularize_Bsplines(target_array.T, degree=2)
+        reg_target_array = np.array([reg_x, reg_y]).T
+        pred_array = load_articulator_array(pred_filepath)
 
-    p2cps = []
-    for target, predicted in zip(targets, contours):
-        x_targets, y_targets = np.where(target == 255)
-        target_points = np.array(list(zip(x_targets, y_targets)))
+        p2cp = p2cp_mean(pred_array, reg_target_array)
 
-        x_preds, y_preds = np.where(predicted == 255)
-        preds_points = np.array(list(zip(x_preds, y_preds)))
+        if pred_class in VocalTractMaskRCNNDataset.closed_articulators:
+            # Calculate the Jaccard Index
+            jacc = 0
+        else:
+            jacc = np.nan
 
-        mean_p2cp = p2cp_mean(target_points, preds_points)
-        p2cps.append(mean_p2cp)
+        basename = os.path.basename(target_filepath)
+        dirname = os.path.dirname(os.path.dirname(target_filepath))
+        sequence = os.path.basename(dirname)
+        subject = os.path.basename(os.path.dirname(dirname))
+        filename, _ = basename.split(".")
+        frame, _ = filename.split("_")
 
-    mean = np.mean(p2cps)
-    sigma = np.std(p2cps)
-    median = np.median(p2cps)
+        results.append(dict(
+            subject=subject,
+            sequence=sequence,
+            frame=frame,
+            pred_class=pred_class,
+            target_filepath=target_filepath,
+            pred_filepath=pred_filepath,
+            p2cp_distance=p2cp,
+            jaccard_index=jacc
+        ))
 
-    return mean, sigma, median
+    return results
 
 
 def run_maskrcnn_test(epoch, model, dataloader, outputs_dir, class_map, threshold=None, device=None):
@@ -210,57 +249,44 @@ def run_deeplabv3_test(epoch, model, dataloader, outputs_dir, class_map, thresho
     return return_outputs
 
 
-def run_evaluation(outputs, classes, save_to=None, load_fn=None):
+def run_evaluation(outputs, save_to, load_fn):
     pred_classes = []
-    targets = []
-    contours = []
+    target_filepaths = []
+    pred_filepaths = []
     for out in outputs:
+        subject = out["subject"]
+        sequence = out["sequence"]
+        input_img_filepath = out["img_filepath"]
+
         target = out["target"] * 255
         mask = out["mask"]
         pred_class = out["pred_cls"]
 
+        frame = "%04d" % out["instance_number"]
+        fname = f"{frame}_{pred_class}"
+
+        outputs_dir = os.path.join(save_to, "inference_contours", subject, sequence)
+        if not os.path.exists(outputs_dir):
+            os.makedirs(outputs_dir)
+
         contour = calculate_contour(pred_class, mask)
-        zeros = np.zeros_like(mask)
-        clean_contour = draw_contour(zeros, contour, color=(255, 255, 255))
 
-        if save_to is not None:
-            if load_fn is None:
-                raise ValueError("If 'save_to' is passed, 'load' cannot be None")
+        img = load_fn(input_img_filepath)
+        save_filepath = os.path.join(outputs_dir,f"{fname}.png")
+        save_image_with_contour(img, save_filepath, contour, target)
 
-            outputs_dir = os.path.join(
-                save_to, "inference_contours", out["subject"], out["sequence"]
-            )
-            if not os.path.exists(outputs_dir):
-                os.makedirs(outputs_dir)
+        npy_filepath = os.path.join(outputs_dir, f"{fname}.npy")
+        with open(npy_filepath, "wb") as f:
+            np.save(f, contour)
 
-            img = load_fn(out["img_filepath"])
-            img_filepath = os.path.join(
-                outputs_dir,
-                f"{'%04d' % out['instance_number']}_{pred_class}.png"
-            )
-            save_image_with_contour(img, img_filepath, contour, target)
+        dirname = os.path.dirname(os.path.dirname(input_img_filepath))
+        target_filepath = os.path.join(dirname, subject, sequence, "inference_contours", f"{fname}.npy")
 
-            npy_filepath = os.path.join(
-                outputs_dir,
-                f"{'%04d' % out['instance_number']}_{pred_class}.npy"
-            )
-            with open(npy_filepath, "wb") as f:
-                np.save(f, contour)
-
-        targets.append(target)
-        contours.append(clean_contour)
         pred_classes.append(pred_class)
+        target_filepaths.append(target_filepath)
+        pred_filepaths.append(npy_filepath)
 
-    results = {}
-    # zipped = list(zip(pred_classes, targets, contours))
-    # for cls_ in classes:
-    #     filtered = funcy.lfilter(lambda t: t[0] == cls_, zipped)
-
-    #     cls_targets = [t[1] for t in filtered]
-    #     cls_contours = [t[2] for t in filtered]
-    #     cls_mean, cls_std, cls_median = evaluate_model(cls_targets, cls_contours)
-
-    #     results[cls_] = (cls_mean, cls_std, cls_median)
+    results = evaluate_model(pred_classes, target_filepaths, pred_filepaths)
 
     return results
 

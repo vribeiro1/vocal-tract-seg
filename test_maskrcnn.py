@@ -1,8 +1,8 @@
 import pdb
 
 import argparse
-import json
 import os
+import pandas as pd
 import torch
 import yaml
 
@@ -21,6 +21,7 @@ def main(cfg):
     model_name = cfg["model_name"]
     image_folder = cfg["image_folder"]
     image_ext = cfg["image_ext"]
+    save_to = cfg["save_to"]
 
     dataset = VocalTractMaskRCNNDataset(
         cfg["datadir"],
@@ -48,8 +49,10 @@ def main(cfg):
         model.load_state_dict(state_dict)
     model.to(device)
 
-    if not os.path.exists(cfg["save_to"]):
-        os.mkdir(cfg["save_to"])
+    if not os.path.exists(save_to):
+        os.mkdir(save_to)
+
+    outputs_dir = os.path.join(save_to, "test_outputs")
 
     class_map = {i: c for c, i in dataset.classes_dict.items()}
     run_test = test_runners[model_name]
@@ -59,20 +62,18 @@ def main(cfg):
         dataloader=dataloader,
         device=device,
         class_map=class_map,
-        outputs_dir=os.path.join(cfg["save_to"], "test_outputs")
+        outputs_dir=outputs_dir
     )
 
     read_fn = getattr(VocalTractMaskRCNNDataset, f"read_{image_ext}")
-    results = run_evaluation(
-        outputs,
-        dataset.classes,
-        os.path.join(cfg["save_to"], "test_outputs"),
-        lambda fp: dataset.resize(read_fn(fp))
+    test_results = run_evaluation(
+        outputs=outputs,
+        save_to=outputs_dir,
+        load_fn=lambda fp: dataset.resize(read_fn(fp))
     )
 
-    results_filepath = os.path.join(cfg["save_to"], "test_results.json")
-    with open(results_filepath, "w") as f:
-        json.dump(results, f)
+    test_results_filepath = os.path.join(save_to, "test_results.csv")
+    pd.DataFrame(test_results).to_csv(test_results_filepath, index=False)
 
 
 if __name__ == "__main__":

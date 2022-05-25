@@ -3,9 +3,9 @@ import pdb
 
 import numpy as np
 import os
+import pandas as pd
 import torch
 import torch.nn as nn
-import ujson
 
 from sacred import Experiment
 from sacred.observers import FileStorageObserver
@@ -321,11 +321,9 @@ def main(_run, model_name, datadir, batch_size, n_epochs, patience, learning_rat
     read_fn = getattr(VocalTractMaskRCNNDataset, f"read_{image_ext}")
     test_results = run_evaluation(
         outputs=test_outputs,
-        classes=test_dataset.classes,
         save_to=outputs_dir,
         load_fn=lambda fp: test_dataset.resize(read_fn(fp))
     )
 
-    test_results_filepath = os.path.join(fs_observer.dir, "test_results.json")
-    with open(test_results_filepath, "w") as f:
-        ujson.dump(test_results, f)
+    test_results_filepath = os.path.join(fs_observer.dir, "test_results.csv")
+    pd.DataFrame(test_results).to_csv(test_results_filepath, index=False)
