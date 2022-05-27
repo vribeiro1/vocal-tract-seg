@@ -74,17 +74,18 @@ def draw_bbox(mask, bbox, text=None):
 def evaluate_model(pred_classes, target_filepaths, pred_filepaths):
     results = []
     for pred_class, target_filepath, pred_filepath in zip(pred_classes, target_filepaths, pred_filepaths):
-        target_array = roiread(target_filepath).coordinates()
-        reg_x, reg_y = regularize_Bsplines(target_array, degree=2)
-        reg_target_array = np.array([reg_x, reg_y]).T
-        pred_array = load_articulator_array(pred_filepath)
-        p2cp = p2cp_mean(pred_array, reg_target_array)
+        p2cp = np.nan
+        jacc = np.nan
+        if pred_filepath is not None:
+            target_array = roiread(target_filepath).coordinates()
+            reg_x, reg_y = regularize_Bsplines(target_array, degree=2)
+            reg_target_array = np.array([reg_x, reg_y]).T
+            pred_array = load_articulator_array(pred_filepath)
+            p2cp = p2cp_mean(pred_array, reg_target_array)
 
-        if pred_class in VocalTractMaskRCNNDataset.closed_articulators:
-            # Calculate the Jaccard Index
-            jacc = 0
-        else:
-            jacc = np.nan
+            if pred_class in VocalTractMaskRCNNDataset.closed_articulators:
+                # Calculate the Jaccard Index
+                jacc = 0
 
         basename = os.path.basename(target_filepath)
         dirname = os.path.dirname(os.path.dirname(target_filepath))
@@ -277,11 +278,11 @@ def run_evaluation(outputs, save_to, load_fn):
         save_image_with_contour(img, save_filepath, contour, target)
 
         if len(contour) == 0:
-            continue
-
-        npy_filepath = os.path.join(outputs_dir, f"{fname}.npy")
-        with open(npy_filepath, "wb") as f:
-            np.save(f, contour)
+            npy_filepath = os.path.join(outputs_dir, f"{fname}.npy")
+            with open(npy_filepath, "wb") as f:
+                np.save(f, contour)
+        else:
+            npy_filepath = None
 
         dirname = os.path.dirname(os.path.dirname(input_img_filepath))
         target_filepath = os.path.join(dirname, "contours", f"{fname}.roi")
