@@ -74,7 +74,7 @@ def evaluate_model(pred_classes, target_filepaths, pred_filepaths):
     results = []
     for pred_class, target_filepath, pred_filepath in zip(pred_classes, target_filepaths, pred_filepaths):
         target_array = roiread(target_filepath).coordinates()
-        reg_x, reg_y = regularize_Bsplines(target_array.T, degree=2)
+        reg_x, reg_y = regularize_Bsplines(target_array, degree=2)
         reg_target_array = np.array([reg_x, reg_y]).T
         pred_array = load_articulator_array(pred_filepath)
         p2cp = p2cp_mean(pred_array, reg_target_array)
