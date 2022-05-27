@@ -277,7 +277,7 @@ def run_evaluation(outputs, save_to, load_fn):
         save_filepath = os.path.join(outputs_dir,f"{fname}.png")
         save_image_with_contour(img, save_filepath, contour, target)
 
-        if len(contour) != 0:
+        if len(contour) > 0:
             npy_filepath = os.path.join(outputs_dir, f"{fname}.npy")
             with open(npy_filepath, "wb") as f:
                 np.save(f, contour)
