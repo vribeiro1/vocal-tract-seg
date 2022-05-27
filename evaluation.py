@@ -1,3 +1,5 @@
+import pdb
+
 import funcy
 import numpy as np
 import os
@@ -36,7 +38,6 @@ def load_articulator_array(filepath, norm_value=None):
         articul_array = articul_array.copy() / norm_value
 
     return articul_array
-
 
 
 def save_image_with_contour(img, filepath, contour, target=None):
@@ -274,6 +275,9 @@ def run_evaluation(outputs, save_to, load_fn):
         img = load_fn(input_img_filepath)
         save_filepath = os.path.join(outputs_dir,f"{fname}.png")
         save_image_with_contour(img, save_filepath, contour, target)
+
+        if len(contour) == 0:
+            continue
 
         npy_filepath = os.path.join(outputs_dir, f"{fname}.npy")
         with open(npy_filepath, "wb") as f:
