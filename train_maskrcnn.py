@@ -150,8 +150,8 @@ def main(_run, model_name, datadir, batch_size, n_epochs, patience, learning_rat
     logging.info(f"Running on '{device.type}'")
 
     writer = SummaryWriter(os.path.join(fs_observer.dir, f"experiment-{_run._id}"))
-    best_model_path = os.path.join(fs_observer.dir, "best_model.pth")
-    last_model_path = os.path.join(fs_observer.dir, "last_model.pth")
+    best_model_path = os.path.join(fs_observer.dir, "best_model.pt")
+    last_model_path = os.path.join(fs_observer.dir, "last_model.pt")
 
     outputs_dir = os.path.join(fs_observer.dir, "outputs")
     if not os.path.exists(outputs_dir):
