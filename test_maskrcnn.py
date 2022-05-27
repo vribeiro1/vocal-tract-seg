@@ -1,6 +1,7 @@
 import pdb
 
 import argparse
+import logging
 import os
 import pandas as pd
 import torch
@@ -17,6 +18,7 @@ from settings import *
 
 def main(cfg):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    logging.info(f"Running on '{device.type}'")
 
     model_name = cfg["model_name"]
     image_folder = cfg["image_folder"]

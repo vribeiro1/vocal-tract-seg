@@ -5,6 +5,7 @@ import torch
 
 from copy import deepcopy
 from PIL import Image, ImageDraw
+from roifile import roiread
 from tqdm import tqdm
 from vt_tools.bs_regularization import regularize_Bsplines
 from vt_tools.metrics import p2cp_mean
@@ -72,11 +73,10 @@ def draw_bbox(mask, bbox, text=None):
 def evaluate_model(pred_classes, target_filepaths, pred_filepaths):
     results = []
     for pred_class, target_filepath, pred_filepath in zip(pred_classes, target_filepaths, pred_filepaths):
-        target_array = load_articulator_array(target_filepath)
+        target_array = roiread(target_filepath).coordinates()
         reg_x, reg_y = regularize_Bsplines(target_array.T, degree=2)
         reg_target_array = np.array([reg_x, reg_y]).T
         pred_array = load_articulator_array(pred_filepath)
-
         p2cp = p2cp_mean(pred_array, reg_target_array)
 
         if pred_class in VocalTractMaskRCNNDataset.closed_articulators:
@@ -280,7 +280,7 @@ def run_evaluation(outputs, save_to, load_fn):
             np.save(f, contour)
 
         dirname = os.path.dirname(os.path.dirname(input_img_filepath))
-        target_filepath = os.path.join(dirname, subject, sequence, "inference_contours", f"{fname}.npy")
+        target_filepath = os.path.join(dirname, "contours", f"{fname}.roi")
 
         pred_classes.append(pred_class)
         target_filepaths.append(target_filepath)
