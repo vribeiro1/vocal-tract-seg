@@ -8,6 +8,7 @@ import torch
 from copy import deepcopy
 from PIL import Image, ImageDraw
 from roifile import roiread
+from scipy.ndimage import binary_fill_holes
 from tqdm import tqdm
 from vt_tools.bs_regularization import regularize_Bsplines
 from vt_tools.metrics import p2cp_mean
@@ -71,6 +72,14 @@ def draw_bbox(mask, bbox, text=None):
     return mask_img
 
 
+def jaccard_index(outputs, targets, eps=1e-15):
+    intersection = (outputs * targets).sum()
+    union = outputs.sum() + targets.sum()
+    jaccard = (intersection + eps) / (union - intersection + eps)
+
+    return jaccard
+
+
 def evaluate_model(pred_classes, target_filepaths, pred_filepaths):
     results = []
     for pred_class, target_filepath, pred_filepath in zip(pred_classes, target_filepaths, pred_filepaths):
@@ -84,8 +93,18 @@ def evaluate_model(pred_classes, target_filepaths, pred_filepaths):
             p2cp = p2cp_mean(pred_array, reg_target_array)
 
             if pred_class in VocalTractMaskRCNNDataset.closed_articulators:
-                # Calculate the Jaccard Index
-                jacc = 0
+                pred_x, pred_y = pred_array.T
+                pred_roi = {"x": pred_x, "y": pred_y}
+
+                target_x, target_y = target_array.T
+                target_roi = {"x": target_x, "y": target_y}
+
+                pred_mask = VocalTractMaskRCNNDataset.roi_to_target_tensor(pred_roi, (136, 136), closed=True)
+                target_mask = VocalTractMaskRCNNDataset.roi_to_target_tensor(target_roi, (136, 136), closed=True)
+
+                pred_mask = binary_fill_holes(pred_mask).astype(int)
+                target_mask = binary_fill_holes(target_mask).astype(int)
+                jacc = jaccard_index(pred_mask, target_mask)
 
         basename = os.path.basename(target_filepath)
         dirname = os.path.dirname(os.path.dirname(target_filepath))

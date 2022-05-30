@@ -1,6 +1,7 @@
 .dev_env
 .vscode
 
+*.csv
 *.pyc
 *.ipynb
 *.out
