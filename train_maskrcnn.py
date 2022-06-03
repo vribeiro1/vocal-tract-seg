@@ -124,6 +124,9 @@ def run_deeplabv3_epoch(phase, epoch, model, dataloader, optimizer, criterion, *
                 loss.backward()
                 optimizer.step()
 
+                if scheduler is not None:
+                    scheduler.step()
+
         losses.append({"loss": loss.item()})
         mean_loss = np.mean([l["loss"] for l in losses])
         progress_bar.set_postfix(loss=mean_loss)
@@ -166,7 +169,7 @@ def main(_run, model_name, datadir, batch_size, n_epochs, patience, learning_rat
 
     optimizer = Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
 
-    if scheduler_type == "reduce_on_plateu":
+    if scheduler_type == "reduce_on_plateau":
         scheduler = ReduceLROnPlateau(optimizer, factor=0.1, patience=10)
     elif scheduler_type == "cyclic_lr":
         base_lr = learning_rate / 50
