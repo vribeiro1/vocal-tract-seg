@@ -284,10 +284,11 @@ class VocalTractMaskRCNNDataset(Dataset, InputLoaderMixin):
             data_item["img_m1_filepath"],
             dcm_fpath,
             data_item["img_p1_filepath"],
-            mode=self.mode
+            mode=self.mode,
+            resize=self.resize
         )
 
-        img_arr = self.to_tensor(self.resize(img))
+        img_arr = self.to_tensor(img)
         if self.annotation == ROI:
             masks, _ = self.create_target(data_item["rois"], img.size)
         else:
