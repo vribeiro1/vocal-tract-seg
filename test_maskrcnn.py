@@ -16,21 +16,28 @@ from helpers import set_seeds
 from settings import *
 
 
-def main(cfg):
+def main(
+    datadir,
+    sequences,
+    classes,
+    model_name,
+    batch_size,
+    size,
+    mode,
+    image_folder,
+    image_ext,
+    state_dict_fpath,
+    save_to
+):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logging.info(f"Running on '{device.type}'")
 
-    model_name = cfg["model_name"]
-    image_folder = cfg["image_folder"]
-    image_ext = cfg["image_ext"]
-    save_to = cfg["save_to"]
-
     dataset = VocalTractMaskRCNNDataset(
-        cfg["datadir"],
-        cfg["sequences"],
-        cfg["classes"],
-        size=cfg["size"],
-        mode=cfg["mode"],
+        datadir,
+        sequences,
+        classes,
+        size=size,
+        mode=mode,
         image_folder=image_folder,
         image_ext=image_ext,
         include_bkg=(model_name == "maskrcnn")
@@ -39,15 +46,15 @@ def main(cfg):
     collate_fn = getattr(VocalTractMaskRCNNDataset, f"{model_name}_collate_fn")
     dataloader = DataLoader(
         dataset,
-        batch_size=cfg["batch_size"],
+        batch_size=batch_size,
         shuffle=False,
         worker_init_fn=set_seeds,
         collate_fn=collate_fn
     )
 
     model = maskrcnn_resnet50_fpn(pretrained=True)
-    if cfg["state_dict_fpath"] is not None:
-        state_dict = torch.load(cfg["state_dict_fpath"], map_location=device)
+    if state_dict_fpath is not None:
+        state_dict = torch.load(state_dict_fpath, map_location=device)
         model.load_state_dict(state_dict)
     model.to(device)
 
@@ -55,7 +62,6 @@ def main(cfg):
         os.mkdir(save_to)
 
     outputs_dir = os.path.join(save_to, "test_outputs")
-
     class_map = {i: c for c, i in dataset.classes_dict.items()}
     run_test = test_runners[model_name]
     outputs = run_test(
@@ -86,4 +92,4 @@ if __name__ == "__main__":
     with open(args.cfg_filepath) as f:
         cfg = yaml.safe_load(f.read())
 
-    main(cfg)
+    main(**cfg)

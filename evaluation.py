@@ -11,7 +11,7 @@ from roifile import roiread
 from scipy.ndimage import binary_fill_holes
 from tqdm import tqdm
 from vt_tools.bs_regularization import regularize_Bsplines
-from vt_tools.metrics import p2cp_mean
+from vt_tools.metrics import p2cp_mean, p2cp_rms
 from vt_tracker.postprocessing.calculate_contours import calculate_contour
 
 from dataset import VocalTractMaskRCNNDataset
@@ -83,14 +83,18 @@ def jaccard_index(outputs, targets, eps=1e-15):
 def evaluate_model(pred_classes, target_filepaths, pred_filepaths):
     results = []
     for pred_class, target_filepath, pred_filepath in zip(pred_classes, target_filepaths, pred_filepaths):
-        p2cp = np.nan
+        rms_p2cp = np.nan
+        mean_p2cp = np.nan
         jacc = np.nan
         if pred_filepath is not None:
             target_array = roiread(target_filepath).coordinates()
             reg_x, reg_y = regularize_Bsplines(target_array, degree=2)
             reg_target_array = np.array([reg_x, reg_y]).T
             pred_array = load_articulator_array(pred_filepath)
-            p2cp = p2cp_mean(pred_array, reg_target_array)
+            reg_x, reg_y = regularize_Bsplines(pred_array, degree=2)
+            reg_pred_array = np.array([reg_x, reg_y]).T
+            mean_p2cp = p2cp_mean(reg_pred_array, reg_target_array)
+            rms_p2cp = p2cp_rms(reg_pred_array, reg_target_array)
 
             if pred_class in VocalTractMaskRCNNDataset.closed_articulators:
                 pred_x, pred_y = pred_array.T
@@ -120,7 +124,8 @@ def evaluate_model(pred_classes, target_filepaths, pred_filepaths):
             pred_class=pred_class,
             target_filepath=target_filepath,
             pred_filepath=pred_filepath,
-            p2cp_distance=p2cp,
+            p2cp_rms=rms_p2cp,
+            p2cp_mean=mean_p2cp,
             jaccard_index=jacc
         ))
 
