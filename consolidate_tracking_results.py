@@ -31,6 +31,11 @@ def consolidate_results_dataframes(results_filepaths):
     df_results = None
     for result_filepath in results_filepaths:
         experiment_dir = os.path.dirname(result_filepath)
+        while not os.path.isfile(os.path.join(experiment_dir, "config.json")):
+            experiment_dir = os.path.dirname(experiment_dir)
+            if experiment_dir.strip("/") == "":
+                raise Exception("Could not infer experiment dir")
+
         experiment = os.path.basename(experiment_dir)
         df = pd.read_csv(result_filepath)
 
@@ -137,6 +142,9 @@ def main(datadir, results_filepaths, save_dir):
     for dir_ in dirs_:
         if not os.path.exists(dir_):
             os.makedirs(dir_)
+
+    save_filepath = os.path.join(tabular_dir, "raw.csv")
+    df.to_csv(save_filepath)
 
     save_filepath = os.path.join(tabular_dir, "p2cp_mean.csv")
     df_p2cp_mean = pivot_table(
