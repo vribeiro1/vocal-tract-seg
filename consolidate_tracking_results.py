@@ -122,13 +122,17 @@ def plot_frame(
     plt.close()
 
 
-def main(datadir, results_filepaths, save_dir):
+def main(datadir, results_filepaths, save_dir, groupby_left_out=False):
     df = consolidate_results_dataframes(results_filepaths)
 
-    df_grouped = df.groupby([
-        "anonym_subject",
-        "pred_class"
-    ]).agg({
+    if groupby_left_out:
+        groupby_cols = ["anonym_subject", "left_out_anonym_subject", "pred_class"]
+        index_cols = ["anonym_subject", "left_out_anonym_subject"]
+    else:
+        groupby_cols = ["anonym_subject", "pred_class"]
+        index_cols = ["anonym_subject"]
+
+    df_grouped = df.groupby(groupby_cols).agg({
         "p2cp_mean": ["mean", "std"],
         "p2cp_rms": ["mean", "std"],
         "jaccard_index": ["mean", "std"]
@@ -150,7 +154,7 @@ def main(datadir, results_filepaths, save_dir):
     df_p2cp_mean = pivot_table(
         df=df_grouped,
         values=["p2cp_mean.mean", "p2cp_mean.std"],
-        index=["anonym_subject"],
+        index=index_cols,
         columns=["pred_class"]
     )
     df_p2cp_mean.to_csv(save_filepath, index=True)
@@ -159,7 +163,7 @@ def main(datadir, results_filepaths, save_dir):
     df_p2cp_rms = pivot_table(
         df=df_grouped,
         values=["p2cp_rms.mean", "p2cp_rms.std"],
-        index=["anonym_subject"],
+        index=index_cols,
         columns=["pred_class"]
     )
     df_p2cp_rms.to_csv(save_filepath, index=True)
@@ -168,7 +172,7 @@ def main(datadir, results_filepaths, save_dir):
     df_jacc = pivot_table(
         df=df_grouped,
         values=["jaccard_index.mean", "jaccard_index.std"],
-        index=["anonym_subject"],
+        index=index_cols,
         columns=["pred_class"]
     )
     df_jacc.to_csv(save_filepath, index=True)
