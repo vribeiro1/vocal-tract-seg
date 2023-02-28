@@ -14,7 +14,6 @@ from vt_tools.bs_regularization import regularize_Bsplines
 from evaluation import load_articulator_array
 from settings import DatasetConfig
 
-
 ANONYM_SUBJECT_MAP = {
     "1612": "S1",
     "1618": "S2",
@@ -29,7 +28,7 @@ ANONYM_SUBJECT_MAP = {
 
 def consolidate_results_dataframes(results_filepaths):
     df_results = None
-    for result_filepath in results_filepaths:
+    for result_filepath, info in results_filepaths:
         experiment_dir = os.path.dirname(result_filepath)
         while not os.path.isfile(os.path.join(experiment_dir, "config.json")):
             experiment_dir = os.path.dirname(experiment_dir)
@@ -45,6 +44,8 @@ def consolidate_results_dataframes(results_filepaths):
         df["p2cp_mean"] = df["p2cp_mean"] * DatasetConfig.PIXEL_SPACING
         df["p2cp_rms"] = df["p2cp_rms"] * DatasetConfig.PIXEL_SPACING
         df["experiment"] = experiment
+        for key, value in info.items():
+            df[key] = value
 
         config_filepath = os.path.join(experiment_dir, "config.json")
         with open(config_filepath) as f:
@@ -127,15 +128,17 @@ def main(datadir, results_filepaths, save_dir, groupby_left_out=False):
 
     if groupby_left_out:
         groupby_cols = ["anonym_subject", "left_out_anonym_subject", "pred_class"]
+        plot_groupby_cols = ["subject", "left_out_subject", "sequence", "frame"]
         index_cols = ["anonym_subject", "left_out_anonym_subject"]
     else:
         groupby_cols = ["anonym_subject", "pred_class"]
+        plot_groupby_cols = ["subject", "sequence", "frame"]
         index_cols = ["anonym_subject"]
 
     df_grouped = df.groupby(groupby_cols).agg({
         "p2cp_mean": ["mean", "std"],
         "p2cp_rms": ["mean", "std"],
-        "jaccard_index": ["mean", "std"]
+        "jaccard_index": ["mean", "std"],
     })
     df_grouped.columns = df_grouped.columns.map('{0[0]}.{0[1]}'.format)
     df_grouped = df_grouped.reset_index()
@@ -177,16 +180,32 @@ def main(datadir, results_filepaths, save_dir, groupby_left_out=False):
     )
     df_jacc.to_csv(save_filepath, index=True)
 
-    grouped = df.groupby(["subject", "sequence", "frame"])
-    total = len(df[["subject", "sequence", "frame"]].drop_duplicates())
+    grouped = df.groupby(plot_groupby_cols)
+    total = len(df[plot_groupby_cols].drop_duplicates())
     progress_bar = tqdm(grouped, desc="Plotting results", total=total)
-    for (subject, sequence, frame), df_frame in progress_bar:
-        img_filepath = os.path.join(datadir, subject, sequence, "NPY_MR", f"{frame}.npy")
-        save_filepaths = [
-            os.path.join(figures_dir, f"{subject}_{sequence}_{frame}.pdf"),
-            os.path.join(figures_dir, f"{subject}_{sequence}_{frame}.png"),
-        ]
-        plot_frame(img_filepath, df_frame, save_filepaths)
+
+    if not groupby_left_out:
+        for (subject, sequence, frame), df_frame in progress_bar:
+            row = df_frame.iloc[0]
+            filepath = row["target_filepath"]
+            seqdir = os.path.dirname(os.path.dirname(filepath))
+            img_filepath = os.path.join(seqdir, "NPY_MR", f"{frame}.npy")
+            save_filepaths = [
+                os.path.join(figures_dir, f"{subject}_{sequence}_{frame}.pdf"),
+                os.path.join(figures_dir, f"{subject}_{sequence}_{frame}.png"),
+            ]
+            plot_frame(img_filepath, df_frame, save_filepaths)
+    else:
+        for (subject, left_out_subject, sequence, frame), df_frame in progress_bar:
+            row = df_frame.iloc[0]
+            filepath = row["target_filepath"]
+            seqdir = os.path.dirname(os.path.dirname(filepath))
+            img_filepath = os.path.join(seqdir, "NPY_MR", f"{frame}.npy")
+            save_filepaths = [
+                os.path.join(figures_dir, f"{left_out_subject}_{subject}_{sequence}_{frame}.pdf"),
+                os.path.join(figures_dir, f"{left_out_subject}_{subject}_{sequence}_{frame}.png"),
+            ]
+            plot_frame(img_filepath, df_frame, save_filepaths)
 
 
 if __name__ == "__main__":

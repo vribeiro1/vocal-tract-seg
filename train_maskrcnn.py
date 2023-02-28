@@ -268,15 +268,6 @@ def main(_run, model_name, datadir, batch_size, n_epochs, patience, learning_rat
             best_metric = info[VALID]["loss"]
             torch.save(model.state_dict(), best_model_path)
             epochs_since_best = 0
-
-            run_test(
-                epoch=epoch,
-                model=model,
-                dataloader=valid_dataloader,
-                device=device,
-                class_map={i: c for c, i in valid_dataset.classes_dict.items()},
-                outputs_dir=outputs_dir
-            )
         else:
             epochs_since_best += 1
 
