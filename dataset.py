@@ -28,8 +28,20 @@ class VocalTractMaskRCNNDataset(Dataset, InputLoaderMixin):
     ]
 
     def __init__(
-        self, datadir, subj_sequences, classes, size=(224, 224), annotation=MASK, input_augs=None, input_target_augs=None,
-        mode="gray", image_folder="dicoms", image_ext="dcm", allow_missing=False, include_bkg=True
+        self,
+        datadir,
+        subj_sequences,
+        classes,
+        size=(224, 224),
+        annotation=MASK,
+        input_augs=None,
+        input_target_augs=None,
+        mode="gray",
+        image_folder="dicoms",
+        image_ext="dcm",
+        allow_missing=False,
+        include_bkg=True,
+        exclusion_list=None
     ):
         if annotation not in (MASK, ROI):
             raise ValueError(f"Annotation level should be either '{MASK}' or '{ROI}'")
@@ -56,7 +68,8 @@ class VocalTractMaskRCNNDataset(Dataset, InputLoaderMixin):
             annotation=annotation,
             img_folder=image_folder,
             img_ext=image_ext,
-            allow_missing=allow_missing
+            allow_missing=allow_missing,
+            exclusion_list=exclusion_list,
         )
         if len(self.data) == 0:
             raise Exception("Empty VocalTractMaskRCNNDataset")
@@ -78,8 +91,19 @@ class VocalTractMaskRCNNDataset(Dataset, InputLoaderMixin):
         self.input_target_augs = input_target_augs
 
     @staticmethod
-    def _collect_data(datadir, sequences, classes, annotation, img_folder="dicoms", img_ext="dcm", allow_missing=False):
+    def _collect_data(
+        datadir,
+        sequences,
+        classes,
+        annotation,
+        img_folder="dicoms",
+        img_ext="dcm",
+        allow_missing=False,
+        exclusion_list=None
+    ):
         data = []
+        if exclusion_list is None:
+            exclusion_list = []
 
         for subject, sequence in sequences:
             images = glob(os.path.join(datadir, subject, sequence, img_folder, f"*.{img_ext}"))
@@ -88,6 +112,9 @@ class VocalTractMaskRCNNDataset(Dataset, InputLoaderMixin):
                 image_dirname = os.path.dirname(os.path.dirname(image_filepath))
                 image_name, _ = os.path.basename(image_filepath).rsplit(".", maxsplit=1)
                 instance_number = int(image_name)
+
+                if (subject, sequence, instance_number) in exclusion_list:
+                    continue
 
                 instance_number_m1 = instance_number - 1
                 image_m1_filepath = os.path.join(
@@ -246,7 +273,11 @@ class VocalTractMaskRCNNDataset(Dataset, InputLoaderMixin):
                 target_arr = torch.zeros(self.resize.size)
                 missing.append(i)
             else:
-                target_arr = self.roi_to_target_tensor(roi, original_size, closed=art in self.closed_articulators)
+                target_arr = self.roi_to_target_tensor(
+                    roi,
+                    original_size,
+                    closed=art in self.closed_articulators
+                )
                 if art in self.closed_articulators:
                     target_arr = binary_fill_holes(target_arr).astype(float)
                 target_arr = self.resize(target_arr)
@@ -364,7 +395,6 @@ class DentalPhonemesDataset(Dataset, InputLoaderMixin):
         dcm_p1_fpath = os.path.join(self.datadir, dcm_p1_fpath) if not pd.isna(dcm_p1_fpath) else None
 
         img = self.load_input(dcm_m1_fpath, dcm_fpath, dcm_p1_fpath, mode=self.mode)
-
         img_arr = self.to_tensor(self.resize(img))
         img_arr = self.normalize(img_arr)
         if self.augmentation is not None:

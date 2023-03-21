@@ -12,7 +12,7 @@ from dataset import VocalTractMaskRCNNDataset
 PINK = np.array([255, 0, 85, 255]) / 255
 BLUE = np.array([0, 139, 231, 255]) / 255
 
-cmap = plt.get_Ecmap("hsv")
+cmap = plt.get_cmap("hsv")
 num_subjects = len(ANONYM_SUBJECT_MAP)
 SUBJECTS_COLORS = {
     anonym_subject: cmap(i / num_subjects)
@@ -154,7 +154,6 @@ def main(datadir, results_filepaths, save_dir):
             second_axis="jaccard_index" if closed_articulator else None,
             save_filepaths=save_filepaths,
         )
-
 
 
 if __name__ == "__main__":
