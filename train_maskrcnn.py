@@ -1,11 +1,13 @@
-import logging
 import pdb
 
+import funcy
+import logging
 import numpy as np
 import os
 import pandas as pd
 import torch
 import torch.nn as nn
+import ujson
 
 from sacred import Experiment
 from sacred.observers import FileStorageObserver
@@ -144,9 +146,27 @@ def run_deeplabv3_epoch(phase, epoch, model, dataloader, optimizer, criterion, *
 
 
 @ex.automain
-def main(_run, model_name, datadir, batch_size, n_epochs, patience, learning_rate, weight_decay,
-         train_sequences, valid_sequences, test_sequences, classes, size, mode,
-         image_folder, image_ext, scheduler_type, state_dict_fpath=None):
+def main(
+    _run,
+    model_name,
+    datadir,
+    batch_size,
+    n_epochs,
+    patience,
+    learning_rate,
+    weight_decay,
+    train_sequences,
+    valid_sequences,
+    test_sequences,
+    classes,
+    size,
+    mode,
+    image_folder,
+    image_ext,
+    scheduler_type,
+    state_dict_fpath=None,
+    exclusion_list_filepath=None,
+):
     assert model_name in model_loaders.keys(), f"Unsuported model '{model_name}'"
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -276,6 +296,12 @@ def main(_run, model_name, datadir, batch_size, n_epochs, patience, learning_rat
         if epochs_since_best > patience:
             break
 
+    if exclusion_list_filepath is not None:
+        with open(exclusion_list_filepath) as f:
+            exclusion_list = funcy.lmap(tuple, ujson.load(f))
+    else:
+        exclusion_list = None
+
     test_dataset = VocalTractMaskRCNNDataset(
         datadir,
         test_sequences,
@@ -284,7 +310,8 @@ def main(_run, model_name, datadir, batch_size, n_epochs, patience, learning_rat
         mode=mode,
         image_folder=image_folder,
         image_ext=image_ext,
-        include_bkg=(model_name == "maskrcnn")
+        include_bkg=(model_name == "maskrcnn"),
+        exclusion_list=exclusion_list,
     )
     test_dataloader = DataLoader(
         test_dataset,

@@ -1,10 +1,12 @@
 import pdb
 
 import argparse
+import funcy
 import logging
 import os
 import pandas as pd
 import torch
+import ujson
 import yaml
 
 from torch.utils.data import DataLoader
@@ -27,10 +29,17 @@ def main(
     image_folder,
     image_ext,
     state_dict_fpath,
-    save_to
+    save_to,
+    exclusion_list_filepath=None
 ):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logging.info(f"Running on '{device.type}'")
+
+    if exclusion_list_filepath is not None:
+        with open(exclusion_list_filepath) as f:
+            exclusion_list = funcy.lmap(tuple, ujson.load(f))
+    else:
+        exclusion_list = None
 
     dataset = VocalTractMaskRCNNDataset(
         datadir,
@@ -40,7 +49,8 @@ def main(
         mode=mode,
         image_folder=image_folder,
         image_ext=image_ext,
-        include_bkg=(model_name == "maskrcnn")
+        include_bkg=(model_name == "maskrcnn"),
+        exclusion_list=exclusion_list,
     )
 
     collate_fn = getattr(VocalTractMaskRCNNDataset, f"{model_name}_collate_fn")
