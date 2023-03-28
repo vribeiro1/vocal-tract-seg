@@ -1,12 +1,12 @@
 .dev_env
 .vscode
-
 *.csv
 *.pyc
 *.ipynb
 *.out
 *.jpg
 *.png
+*.gif
 *.pdf
 *.txt
 *.stderr
@@ -14,11 +14,8 @@
 
 .ipynb_checkpoints
 __pycache__
-
 config/*
 !config/*.yaml.example
-
 results*
 runs*
-
 data
