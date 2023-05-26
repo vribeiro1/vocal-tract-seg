@@ -10,7 +10,7 @@ sequences:
         - sequence_id
         - sequence_id
 classes:
-    - arytenoid-muscle
+    - arytenoid-cartilage
     - epiglottis
     - lower-lip
     - pharynx

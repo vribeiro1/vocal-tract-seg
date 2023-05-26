@@ -26,8 +26,8 @@ def plot_fine_tuning(articulator, df, first_axis, second_axis=None, save_filepat
     elif isinstance(save_filepaths, str):
         save_filepaths = [save_filepaths]
 
-    fontsize = 22
-    labelsize = 16
+    fontsize = 28
+    labelsize = 22
     lw = 2
     alpha = 0.2
     alpha_aux = 1.0
@@ -117,7 +117,6 @@ def plot_fine_tuning(articulator, df, first_axis, second_axis=None, save_filepat
             )
 
     ax1.set_xlabel("fine tuning size", fontsize=fontsize)
-    plt.title(articulator.replace("-", " "), fontsize=fontsize)
     plt.tight_layout()
 
     for filepath in save_filepaths:

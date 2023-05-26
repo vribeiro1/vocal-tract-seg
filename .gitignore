@@ -19,3 +19,4 @@ config/*
 results*
 runs*
 data
+mlruns/*

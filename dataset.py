@@ -16,6 +16,7 @@ from torchvision import transforms
 from vt_tools import THYROID_CARTILAGE, VOCAL_FOLDS
 from vt_tracker.input import InputLoaderMixin
 
+from helpers import sequences_from_dict
 from read_roi import read_roi_zip
 
 MASK = "mask"
@@ -49,18 +50,7 @@ class VocalTractMaskRCNNDataset(Dataset, InputLoaderMixin):
         if mode not in ("rgb", "gray"):
             raise ValueError(f"Mode should be either 'rgb' or 'gray'")
 
-        sequences = []
-        for subj, seqs in subj_sequences.items():
-            use_seqs = seqs
-            if len(seqs) == 0:
-                # Use all sequences
-                use_seqs = filter(
-                    lambda s: s.startswith("S") and os.path.isdir(os.path.join(datadir, subj, s)),
-                    os.listdir(os.path.join(datadir, subj))
-                )
-
-            sequences.extend([(subj, seq) for seq in use_seqs])
-
+        sequences = sequences_from_dict(datadir, subj_sequences)
         self.data = self._collect_data(
             datadir=datadir,
             sequences=sequences,

@@ -12,23 +12,9 @@ from skimage.measure import regionprops
 from vt_tools.bs_regularization import regularize_Bsplines
 from vt_tracker.visualization import uint16_to_uint8
 
+from helpers import sequences_from_dict
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-
-def sequences_from_dict(datadir, sequences_dict):
-    sequences = []
-    for subj, seqs in sequences_dict.items():
-        use_seqs = seqs
-        if len(seqs) == 0:
-            # Use all sequences
-            use_seqs = filter(
-                lambda s: os.path.isdir(os.path.join(datadir, subj, s)),
-                os.listdir(os.path.join(datadir, subj))
-            )
-
-        sequences.extend([(subj, seq) for seq in use_seqs])
-
-    return sequences
 
 
 def remove_duplicates(iterable):
