@@ -56,8 +56,12 @@ def run_maskrcnn_epoch(phase, epoch, model, dataloader, optimizer, *args, schedu
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     training = phase == TRAIN
 
+    if training:
+        model.train()
+    else:
+        model.eval()
+
     losses = []
-    model.train()
     progress_bar = tqdm(dataloader, desc=f"Epoch {epoch} - {phase}")
     for i, (_, inputs, targets_dict) in enumerate(progress_bar):
         inputs = inputs.to(device)
@@ -110,8 +114,12 @@ def run_deeplabv3_epoch(phase, epoch, model, dataloader, optimizer, criterion, *
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     training = phase == TRAIN
 
+    if training:
+        model.train()
+    else:
+        model.eval()
+
     losses = []
-    model.train()
     progress_bar = tqdm(dataloader, desc=f"Epoch {epoch} - {phase}")
     for i, (_, inputs, targets) in enumerate(progress_bar):
         inputs = inputs.to(device)
