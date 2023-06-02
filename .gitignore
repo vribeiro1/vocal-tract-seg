@@ -1,5 +1,6 @@
 .dev_env
 .vscode
+*.yaml
 *.csv
 *.pyc
 *.ipynb
@@ -14,8 +15,6 @@
 
 .ipynb_checkpoints
 __pycache__
-config/*
-!config/*.yaml.example
 results*
 runs*
 data

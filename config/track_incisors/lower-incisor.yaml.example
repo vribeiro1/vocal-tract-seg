@@ -1,0 +1,23 @@
+overwrite: False
+datadir: /path/to/ArtSpeech_Database_2
+database: artspeech2
+search_space:
+    x0: 0
+    y0: 60
+    x1: 60
+    y1: 120
+sequences:
+    "1775": []
+    "1777": []
+    "1789": []
+    "1791": []
+    "1804": []
+save_to: /path/to/save/dir
+control_params:
+    - [ -5, -15]
+    - [ -6, -18]
+    - [ -3, -17]
+    - [  0, -13]
+    - [  4,  -7]
+    - [ 14,  -7]
+    - [ 17,  -7]

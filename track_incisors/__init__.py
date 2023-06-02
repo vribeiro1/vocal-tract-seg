@@ -86,7 +86,6 @@ def load_input_image(filepath):
 
 
 def load_segmentation_mask(filepath, size):
-    filename, _ = os.path.basename(filepath).split(".")
     roi = roifile.roiread(filepath)
     mask = binary_fill_holes(roi_to_target_tensor(roi, size)).astype(np.uint8)
 
@@ -96,25 +95,57 @@ def load_segmentation_mask(filepath, size):
     return mask, (x0, y0, x1, y1)
 
 
-def get_sequence_reference_mask(
-    database,
+def get_reference_filepaths(
+    database_name,
     datadir,
     subject,
     incisor,
-    margin=1
+    sequence="S*"
 ):
     ref_mask_filepath = funcy.first(
         glob(os.path.join(
             BASE_DIR,
             "data",
             "ref_masks",
-            database,
+            database_name,
             subject,
-            f"S*_{incisor}.roi"
+            f"{sequence}_{incisor}.roi"
         ))
     )
+
+    if ref_mask_filepath is None:
+        ref_mask_filepath = funcy.first(
+            glob(os.path.join(
+                BASE_DIR,
+                "data",
+                "ref_masks",
+                database_name,
+                subject,
+                f"S*_{incisor}.roi"
+            ))
+        )
+
     ref_sequence, _ = os.path.basename(ref_mask_filepath).split("_")
     ref_filepath = os.path.join(datadir, subject, ref_sequence, "NPY_MR", "0001.npy")
+
+    return ref_mask_filepath, ref_filepath
+
+
+def get_sequence_reference_mask(
+    database_name,
+    datadir,
+    subject,
+    incisor,
+    sequence="S*",
+    margin=1,
+):
+    ref_mask_filepath, ref_filepath = get_reference_filepaths(
+        database_name,
+        datadir,
+        subject,
+        incisor,
+        sequence,
+    )
 
     ref_arr = load_input_image(ref_filepath)
     _, bbox = load_segmentation_mask(ref_mask_filepath, ref_arr.shape)

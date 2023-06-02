@@ -10,7 +10,7 @@ from multiprocessing import Pool
 from scipy.ndimage import rotate
 from skimage.metrics import structural_similarity
 
-from track_incisors import *
+from helpers import *
 
 
 def optimize(search_arr, rotations, metric, how=max):
@@ -101,7 +101,13 @@ def compute_references(
     search_space,
     save_to=None
 ):
-    ref_mask = get_sequence_reference_mask(database, datadir, subject, "lower-incisor")
+    ref_mask = get_sequence_reference_mask(
+        database,
+        datadir,
+        subject,
+        "lower-incisor",
+        sequence,
+    )
     rotations = create_rotated_masks(ref_mask, min_deg=-10, max_deg=21, step=1)
     angles = list(rotations.keys())
     metric = structural_similarity
@@ -114,7 +120,9 @@ def compute_references(
     data = []
     dcm_filepaths = sorted(glob(os.path.join(datadir, subject, sequence, "NPY_MR", "*.npy")))
     curr_angle = 0
-    for other_filepath in dcm_filepaths:
+    for i, other_filepath in enumerate(dcm_filepaths, start=1):
+        print(f"{subject}-{sequence} Processing {'%04d' % i}/{len(dcm_filepaths)}")
+
         other_arr = load_input_image(other_filepath)
         search_arr = other_arr[y0_search:y1_search, x0_search:x1_search]
 
@@ -130,7 +138,7 @@ def compute_references(
         xc = x0_search + optim["xc"]
         yc = y0_search + optim["yc"]
 
-        rel_filepath = other_filepath.replace(os.path.dirname(DATA_DIR), "").strip("/")
+        rel_filepath = other_filepath.replace(os.path.dirname(datadir), "").strip("/")
         item = {
             "subject": subject,
             "sequence": sequence,
@@ -175,7 +183,7 @@ def process_sequence(item):
     control_params = cfg["control_params"]
 
     if not os.path.exists(save_to):
-            os.makedirs(save_to)
+        os.makedirs(save_to)
     csv_filepath = os.path.join(save_to, f"optimization_lower-incisor_{subject}-{sequence}.csv")
 
     if os.path.isfile(csv_filepath) and not overwrite:
@@ -190,7 +198,7 @@ def process_sequence(item):
             csv_filepath
         )
 
-    for i, row in df.iterrows():
+    for _, row in df.iterrows():
         frame = "%04d" % row["frame"]
         x0 = row["avg_x0"]
         y0 = row["avg_y0"]
