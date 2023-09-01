@@ -11,6 +11,7 @@ from multiprocessing import Pool
 from skimage.metrics import structural_similarity
 from tqdm import tqdm
 
+from helpers import sequences_from_dict
 from track_incisors import *
 
 
@@ -88,8 +89,17 @@ def compute_references(
     sequence,
     search_space,
     save_to=None,
+    img_dir="NPY_MR",
+    img_ext="npy",
 ):
-    ref_mask = get_sequence_reference_mask(database, datadir, subject, "upper-incisor")
+    ref_mask = get_sequence_reference_mask(
+        database,
+        datadir,
+        subject,
+        "upper-incisor",
+        img_dir=img_dir,
+        img_ext=img_ext,
+    )
     metric = structural_similarity
 
     process_other = partial(
@@ -99,7 +109,7 @@ def compute_references(
         metric=metric
     )
 
-    dcm_filepaths = sorted(glob(os.path.join(datadir, subject, sequence, "NPY_MR", "*.npy")))
+    dcm_filepaths = sorted(glob(os.path.join(datadir, subject, sequence, img_dir, f"*.{img_ext}")))
     progress_bar = tqdm(dcm_filepaths, desc=f"{subject} {sequence}")
     with Pool(10) as pool:
         data = pool.map(process_other, progress_bar)
@@ -135,6 +145,8 @@ if __name__ == "__main__":
     save_to = cfg["save_to"]
     search_space = cfg["search_space"]
     control_params = cfg["control_params"]
+    img_dir = cfg["img_dir"]
+    img_ext = cfg["img_ext"]
     sequences = sequences_from_dict(datadir, cfg["sequences"])
 
     for subject, sequence in sequences:
@@ -151,7 +163,9 @@ if __name__ == "__main__":
                 subject,
                 sequence,
                 search_space,
-                csv_filepath
+                csv_filepath,
+                img_dir,
+                img_ext,
             )
 
         for i, row in tqdm(df.iterrows(), desc=f"{subject} {sequence} Drawing upper incisor", total=len(df)):

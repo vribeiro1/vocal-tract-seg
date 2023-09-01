@@ -1,4 +1,3 @@
-import cv2
 import funcy
 import numpy as np
 import os
@@ -11,8 +10,6 @@ from scipy.ndimage.morphology import binary_fill_holes
 from skimage.measure import regionprops
 from vt_tools.bs_regularization import regularize_Bsplines
 from vt_tracker.visualization import uint16_to_uint8
-
-from helpers import sequences_from_dict
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -100,7 +97,9 @@ def get_reference_filepaths(
     datadir,
     subject,
     incisor,
-    sequence="S*"
+    sequence="S*",
+    img_dir="NPY_MR",
+    img_ext="npy",
 ):
     ref_mask_filepath = funcy.first(
         glob(os.path.join(
@@ -126,7 +125,7 @@ def get_reference_filepaths(
         )
 
     ref_sequence, _ = os.path.basename(ref_mask_filepath).split("_")
-    ref_filepath = os.path.join(datadir, subject, ref_sequence, "NPY_MR", "0001.npy")
+    ref_filepath = os.path.join(datadir, subject, ref_sequence, img_dir, f"0001.{img_ext}")
 
     return ref_mask_filepath, ref_filepath
 
@@ -138,6 +137,8 @@ def get_sequence_reference_mask(
     incisor,
     sequence="S*",
     margin=1,
+    img_dir="NPY_MR",
+    img_ext="npy",
 ):
     ref_mask_filepath, ref_filepath = get_reference_filepaths(
         database_name,
@@ -145,6 +146,8 @@ def get_sequence_reference_mask(
         subject,
         incisor,
         sequence,
+        img_dir=img_dir,
+        img_ext=img_ext,
     )
 
     ref_arr = load_input_image(ref_filepath)

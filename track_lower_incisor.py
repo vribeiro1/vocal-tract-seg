@@ -10,7 +10,8 @@ from multiprocessing import Pool
 from scipy.ndimage import rotate
 from skimage.metrics import structural_similarity
 
-from helpers import *
+from helpers import sequences_from_dict
+from track_incisors import *
 
 
 def optimize(search_arr, rotations, metric, how=max):
@@ -99,7 +100,9 @@ def compute_references(
     subject,
     sequence,
     search_space,
-    save_to=None
+    save_to=None,
+    img_dir="NPY_MR",
+    img_ext="npy",
 ):
     ref_mask = get_sequence_reference_mask(
         database,
@@ -107,6 +110,8 @@ def compute_references(
         subject,
         "lower-incisor",
         sequence,
+        img_dir=img_dir,
+        img_ext=img_ext,
     )
     rotations = create_rotated_masks(ref_mask, min_deg=-10, max_deg=21, step=1)
     angles = list(rotations.keys())
@@ -118,7 +123,7 @@ def compute_references(
     y1_search = search_space["y1"]
 
     data = []
-    dcm_filepaths = sorted(glob(os.path.join(datadir, subject, sequence, "NPY_MR", "*.npy")))
+    dcm_filepaths = sorted(glob(os.path.join(datadir, subject, sequence, img_dir, f"*.{img_ext}")))
     curr_angle = 0
     for i, other_filepath in enumerate(dcm_filepaths, start=1):
         print(f"{subject}-{sequence} Processing {'%04d' % i}/{len(dcm_filepaths)}")
@@ -181,6 +186,8 @@ def process_sequence(item):
     save_to = cfg["save_to"]
     search_space = cfg["search_space"]
     control_params = cfg["control_params"]
+    img_dir = cfg["img_dir"]
+    img_ext = cfg["img_ext"]
 
     if not os.path.exists(save_to):
         os.makedirs(save_to)
@@ -195,7 +202,9 @@ def process_sequence(item):
             subject,
             sequence,
             search_space,
-            csv_filepath
+            csv_filepath,
+            img_dir=img_dir,
+            img_ext=img_ext,
         )
 
     for _, row in df.iterrows():
