@@ -12,7 +12,9 @@ from vt_tools import COLORS
 from vt_tools.bs_regularization import regularize_Bsplines
 
 from evaluation import load_articulator_array
-from settings import DatasetConfig
+from settings import DATASET_CONFIG
+
+DatasetConfig = DATASET_CONFIG["artspeech"]
 
 ANONYM_SUBJECT_MAP = {
     "1612": "S1",
@@ -21,8 +23,8 @@ ANONYM_SUBJECT_MAP = {
     "1638": "S4",
     "1640": "S5",
     "1659": "S6",
-    "1662": "S7",
-    "1775": "S8"
+    "1662": "S7.1",
+    "1775": "S7.2"
 }
 
 

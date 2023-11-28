@@ -6,6 +6,7 @@
 *.ipynb
 *.out
 *.jpg
+*.json
 *.png
 *.gif
 *.pdf

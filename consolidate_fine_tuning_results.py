@@ -2,9 +2,7 @@ import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-import pandas as pd
 import yaml
-import ujson
 
 from consolidate_tracking_results import ANONYM_SUBJECT_MAP, consolidate_results_dataframes
 from dataset import VocalTractMaskRCNNDataset
@@ -138,10 +136,19 @@ def main(datadir, results_filepaths, save_dir):
     df_grouped.columns = df_grouped.columns.map('{0[0]}.{0[1]}'.format)
     df_grouped = df_grouped.reset_index()
 
+    tabular_dir = os.path.join(save_dir, "tabular")
+    figures_dir = os.path.join(save_dir, "figures")
+    dirs_ = [tabular_dir, figures_dir]
+    for dir_ in dirs_:
+        if not os.path.exists(dir_):
+            os.makedirs(dir_)
+
+    df.to_csv(os.path.join(tabular_dir, "raw.csv"))
+
     for articulator in df.pred_class.unique():
         save_filepaths = [
-            os.path.join(save_dir, f"{articulator}.png"),
-            os.path.join(save_dir, f"{articulator}.pdf"),
+            os.path.join(figures_dir, f"{articulator}.png"),
+            os.path.join(figures_dir, f"{articulator}.pdf"),
         ]
 
         df_articulator = df_grouped[df_grouped.pred_class == articulator]
