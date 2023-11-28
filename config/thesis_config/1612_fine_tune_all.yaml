@@ -1,0 +1,48 @@
+model_name: maskrcnn
+scheduler_type: reduce_on_plateau
+image_folder: NPY_MR
+image_ext: npy
+datadir: /srv/storage/talc3@talc-data.nancy/multispeech/calcul/users/vsouzaribeiro/datasets
+state_dict_fpath: /home/vsouzaribeiro/workspace/vocal-tract-seg/results/1/best_model.pt
+mode: rgb
+batch_size: 8
+n_epochs: 20
+patience: 20
+learning_rate: 0.00001
+weight_decay: 0.001
+size: [136, 136]
+train_sequences:
+    "ArtSpeech_Vocal_Tract_Segmentation_RGB/1612":
+        - S12
+        - S13
+        - S14
+        - S15
+        - S16
+        - S17
+        - S18
+        - S19
+        - S20
+        - S21
+        - S22
+valid_sequences:
+    "ArtSpeech_Database_2/1775":
+        - S6
+        - S26
+    "ArtSpeech_Vocal_Tract_Segmentation_RGB/1612":
+        - S8
+test_sequences:
+    "ArtSpeech_Vocal_Tract_Segmentation_RGB/1612":
+        - S7
+        - S9
+        - S10
+        - S11
+classes:
+    - arytenoid-cartilage
+    - epiglottis
+    - lower-lip
+    - pharynx
+    - soft-palate-midline
+    - thyroid-cartilage
+    - tongue
+    - upper-lip
+    - vocal-folds

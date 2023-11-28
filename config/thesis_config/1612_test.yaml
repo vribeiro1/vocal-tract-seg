@@ -1,0 +1,26 @@
+model_name: maskrcnn
+image_folder: NPY_MR
+image_ext: npy
+datadir: /srv/storage/talc3@talc-data.nancy/multispeech/calcul/users/vsouzaribeiro/datasets
+state_dict_fpath: /home/vsouzaribeiro/workspace/vocal-tract-seg/results/1/best_model.pt
+save_to: /home/vsouzaribeiro/workspace/vocal-tract-seg/results/1
+exclusion_list_filepath: /home/vsouzaribeiro/workspace/vocal-tract-seg/config/leave_one_out/swallowing.json
+mode: rgb
+size: [136, 136]
+batch_size: 8
+sequences:
+    "ArtSpeech_Vocal_Tract_Segmentation_RGB/1612":
+        - S7
+        - S9
+        - S10
+        - S11
+classes:
+    - arytenoid-cartilage
+    - epiglottis
+    - lower-lip
+    - pharynx
+    - soft-palate-midline
+    - thyroid-cartilage
+    - tongue
+    - upper-lip
+    - vocal-folds

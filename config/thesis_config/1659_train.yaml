@@ -1,0 +1,121 @@
+model_name: maskrcnn
+scheduler_type: cyclic_lr
+image_folder: NPY_MR
+image_ext: npy
+datadir: /srv/storage/talc3@talc-data.nancy/multispeech/calcul/users/vsouzaribeiro/datasets
+mode: rgb
+batch_size: 8
+n_epochs: 500
+patience: 20
+learning_rate: 0.0001
+weight_decay: 0.001
+size: [136, 136]
+exclusion_list_filepath: /home/vsouzaribeiro/workspace/vocal-tract-seg/config/leave_one_out/swallowing.json
+train_sequences:
+    "ArtSpeech_Database_2/1775":
+        - S8
+        - S10
+        - S13
+        - S14
+        - S15
+        - S16
+        - S17
+        - S18
+        - S19
+        - S20
+        - S23
+        - S27
+        - S28
+        - S29
+        - S30
+        - S32
+    "ArtSpeech_Vocal_Tract_Segmentation_RGB/1612":
+        - S12
+        - S13
+        - S14
+        - S15
+        - S16
+        - S17
+        - S18
+        - S19
+        - S20
+        - S21
+        - S22
+    "ArtSpeech_Vocal_Tract_Segmentation_RGB/1618":
+        - S7
+        - S9
+        - S12
+        - S13
+        - S15
+        - S16
+        - S17
+        - S18
+        - S19
+        - S20
+        - S22
+    "ArtSpeech_Vocal_Tract_Segmentation_RGB/1635":
+        - S7
+        - S8
+        - S10
+        - S11
+        - S12
+        - S13
+        - S14
+        - S15
+        - S17
+        - S18
+        - S21
+    "ArtSpeech_Vocal_Tract_Segmentation_RGB/1638":
+        - S7
+        - S10
+        - S12
+        - S14
+        - S15
+        - S16
+        - S17
+        - S18
+        - S19
+        - S21
+        - S22
+    "ArtSpeech_Vocal_Tract_Segmentation_RGB/1640":
+        - S9
+        - S11
+        - S12
+        - S15
+        - S17
+        - S18
+        - S19
+        - S20
+        - S21
+        - S22
+        - S23
+    "ArtSpeech_Vocal_Tract_Segmentation_RGB/1662":
+        - S14
+        - S15
+        - S17
+        - S18
+        - S19
+        - S20
+        - S21
+        - S22
+valid_sequences:
+    "ArtSpeech_Database_2/1775":
+        - S6
+        - S26
+test_sequences:
+    "ArtSpeech_Vocal_Tract_Segmentation_RGB/1659":
+        - S7
+        - S8
+        - S9
+        - S10
+        - S13
+classes:
+    - arytenoid-cartilage
+    - epiglottis
+    - lower-lip
+    - pharynx
+    - soft-palate-midline
+    - thyroid-cartilage
+    - tongue
+    - upper-lip
+    - vocal-folds
