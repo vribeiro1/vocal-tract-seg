@@ -11,7 +11,7 @@ Université de Lorraine
 
 <hr>
 
-This repository contains the code related to the following studies:
+# Related publications
 
 <ul>
 
