@@ -9,7 +9,7 @@ Université de Lorraine
 <b>LinkedIn:</b> https://www.linkedin.com/in/vribeiro1/<br>
 <b>Web:</b> https://vribeiro1.github.io<br>
 
-# Related publications
+### Related publications
 
 <ul>
 
@@ -27,7 +27,7 @@ Nov 10, 2023 <a href="https://vribeiro1.github.io/publications#:~:text=Computer%
 
 </ul>
 
-# External dependencies
+### External dependencies
 
 This repository requires vt_tracker and vt_tools. They are available at Inria's Gitlab
 (<a href="https://gitlab.inria.fr/vsouzari/vt_tracker">vt_tracker</a> and
