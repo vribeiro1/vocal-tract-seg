@@ -9,8 +9,6 @@ Université de Lorraine
 <b>LinkedIn:</b> https://www.linkedin.com/in/vribeiro1/<br>
 <b>Web:</b> https://vribeiro1.github.io<br>
 
-<hr>
-
 # Related publications
 
 <ul>
@@ -18,20 +16,16 @@ Université de Lorraine
 <li>
 <b>Deep Supervision of the Vocal Tract Shape for Articulatory Synthesis of Speech</b><br>
 Vinicius Ribeiro<br>
-Ph.D. Thesis<br>
+Ph.D. Thesis
 </li>
 
 <li>
 <b>Automatic Segmentation of Vocal Tract Articulators in Real-Time Magnetic Resonance Imaging</b><br>
 Vinicius Ribeiro, Karyna Isaieva, Justine Leclere, Jacques Felblinger, Pierre-André Vuissoz, Yves Laprie<br>
-Nov 10, 2023 <a href="https://vribeiro1.github.io/publications#:~:text=Computer%20Methods%20and%20Programs%20in%20Biomedicine">Computer Methods and Programs in Biomedicine</a><br>
+Nov 10, 2023 <a href="https://vribeiro1.github.io/publications#:~:text=Computer%20Methods%20and%20Programs%20in%20Biomedicine">Computer Methods and Programs in Biomedicine</a>
 </li>
 
 </ul>
-
-<br>
-
-<hr>
 
 # External dependencies
 
