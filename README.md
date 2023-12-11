@@ -1,9 +1,5 @@
 # Automatic Segmentation of Vocal Tract Articulators in Real-Time Magnetic Resonance Imaging
 
-<br>
-
-<img src="static/img/8066_0009_6.gif"> <img src="static/img/8066_0010_4.gif">
-
 <hr>
 
 This repository contains the code related to the following studies:
