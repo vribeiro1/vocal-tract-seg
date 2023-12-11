@@ -1,5 +1,14 @@
 # Automatic Segmentation of Vocal Tract Articulators in Real-Time Magnetic Resonance Imaging
 
+Vinicius de Paulo Souza Ribeiro
+LORIA - Laboratoire Lorrain de Recherche en Informatique et ses Applications
+Université de Lorraine
+
+Contact me:
+E-mail: vinicius.ribeiro1@gmail.com
+LinkedIn: https://www.linkedin.com/in/vribeiro1/
+Web: https://vribeiro1.github.io
+
 <hr>
 
 This repository contains the code related to the following studies:
