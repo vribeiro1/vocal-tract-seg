@@ -17,8 +17,8 @@ This repository contains the code related to the following studies:
 
 <li>
 <b>Deep Supervision of the Vocal Tract Shape for Articulatory Synthesis of Speech</b><br>
-Vinicius Ribeiro
-Ph.D. Thesis
+Vinicius Ribeiro<br>
+Ph.D. Thesis<br>
 </li>
 
 <li>
