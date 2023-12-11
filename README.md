@@ -29,9 +29,7 @@ Nov 10, 2023 <a href="https://vribeiro1.github.io/publications#:~:text=Computer%
 
 ### External dependencies
 
-This repository requires vt_tracker and vt_tools. They are available at Inria's Gitlab
-(<a href="https://gitlab.inria.fr/vsouzari/vt_tracker">vt_tracker</a> and
-<a href="https://gitlab.inria.fr/vsouzari/vt_tools">vt_tools</a>) . To install the library, follow
+This repository requires <a href="https://gitlab.inria.fr/vsouzari/vt_tracker">vt_tracker</a> and <a href="https://gitlab.inria.fr/vsouzari/vt_tools">vt_tools</a>, which are available at Inria's Gitlab. To install the library, follow
 the instructions bellow.
 
 <ol>
