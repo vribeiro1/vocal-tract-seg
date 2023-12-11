@@ -1,4 +1,8 @@
-import pdb
+####################################################################################################
+#
+# Test a convolutional neural network to perform border segmentation of vocal tract articulators.
+#
+####################################################################################################
 
 import argparse
 import funcy

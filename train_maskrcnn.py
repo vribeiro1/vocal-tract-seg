@@ -1,4 +1,8 @@
-import pdb
+####################################################################################################
+#
+# Train a convolutional neural network to perform border segmentation of vocal tract articulators.
+#
+####################################################################################################
 
 import funcy
 import logging

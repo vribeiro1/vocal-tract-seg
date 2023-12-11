@@ -1,12 +1,34 @@
-# Deep contour delineation of vocal tract articulaty structures from RT-MRI
+# Automatic Segmentation of Vocal Tract Articulators in Real-Time Magnetic Resonance Imaging
 
 <br>
 
 <img src="static/img/8066_0009_6.gif"> <img src="static/img/8066_0010_4.gif">
 
+<hr>
+
+This repository contains the code related to the following studies:
+
+<ul>
+
+<li>
+<b>Deep Supervision of the Vocal Tract Shape for Articulatory Synthesis of Speech</b><br>
+Vinicius Ribeiro
+Ph.D. Thesis
+</li>
+
+<li>
+<b>Automatic Segmentation of Vocal Tract Articulators in Real-Time Magnetic Resonance Imaging</b><br>
+Vinicius Ribeiro, Karyna Isaieva, Justine Leclere, Jacques Felblinger, Pierre-André Vuissoz, Yves Laprie<br>
+Nov 10, 2023 <a href="https://vribeiro1.github.io/publications#:~:text=Computer%20Methods%20and%20Programs%20in%20Biomedicine">Computer Methods and Programs in Biomedicine</a><br>
+</li>
+
+</ul>
+
 <br>
 
-# VT Tracker and VT Tools Dependency
+<hr>
+
+# External dependencies
 
 This repository requires vt_tracker and vt_tools. They are available at Inria's Gitlab
 (<a href="https://gitlab.inria.fr/vsouzari/vt_tracker">vt_tracker</a> and
