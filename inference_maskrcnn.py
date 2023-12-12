@@ -14,7 +14,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from vt_tools.bs_regularization import regularize_Bsplines
 from vt_tracker import border_segmentation
-from vt_tracker.postprocessing import POST_PROCESSING, dental_articulation
+from vt_tracker.postprocessing import POST_PROCESSING
 from vt_tracker.postprocessing.calculate_contours import calculate_contour
 
 from dataset import VocalTractMaskRCNNDataset
@@ -253,11 +253,6 @@ def process_out(output_item, datadir, save_to):
         gravity_curve = None
 
     post_proc_cfg = deepcopy(POST_PROCESSING[pred_class])
-    if pred_class == TONGUE and not output_item["is_dental"]:
-        # Deactivate gravity algorithm for non-dental articulations
-        post_proc_cfg["G"] = 0
-        post_proc_cfg["delta"] = 0
-
     contour = calculate_contour(pred_class, mask, gravity_curve=gravity_curve, cfg=post_proc_cfg)
     if len(contour) > 0:
         contour = smooth_contour(contour)
@@ -296,24 +291,6 @@ def main(cfg):
     if not os.path.exists(cfg["save_to"]):
         os.mkdir(cfg["save_to"])
 
-    # densenet = dental_articulation.load_model(device.type)
-    # progress_bar = tqdm(dataloader, desc=f"Dental articulation")
-
-    # make_key = lambda d: "_".join([
-    #     d["subject"],
-    #     d["sequence"],
-    #     "%04d" % d["instance_number"]
-    # ])
-
-    # is_dental_map = {}
-    # for batch_info, batch_inputs, _ in progress_bar:
-    #     batch_outputs = dental_articulation.discriminate_dental_articulations(
-    #         batch_inputs, device=device.type, model=densenet
-    #     )
-    #     for info, output in zip(batch_info, batch_outputs):
-    #         is_dental = bool(output.item())
-    #         is_dental_map[make_key(info)] = is_dental
-
     if inference_directory is None:
         state_dict = cfg.get("state_dict_fpath")
         mask_rcnn = border_segmentation.load_model(device.type, state_dict_filepath=state_dict)
@@ -332,9 +309,6 @@ def main(cfg):
         )
 
     for output_item in tqdm(border_seg_outputs, desc="Calculating contours"):
-        # is_dental = is_dental_map[make_key(output_item)]
-        is_dental = False
-        output_item["is_dental"] = is_dental
         process_out(output_item, cfg["datadir"], cfg["save_to"])
 
 
