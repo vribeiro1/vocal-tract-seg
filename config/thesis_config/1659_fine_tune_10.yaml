@@ -12,17 +12,17 @@ learning_rate: 0.00001
 weight_decay: 0.001
 size: [136, 136]
 train_sequences:
-    "ArtSpeech_Vocal_Tract_Segmentation_RGB/1659":
+    "ArtSpeech_Vocal_Tract_Segmentation/1659":
         - S16
         - S17
 valid_sequences:
     "ArtSpeech_Database_2/1775":
         - S6
         - S26
-    "ArtSpeech_Vocal_Tract_Segmentation_RGB/1659":
+    "ArtSpeech_Vocal_Tract_Segmentation/1659":
         - S15
 test_sequences:
-    "ArtSpeech_Vocal_Tract_Segmentation_RGB/1659":
+    "ArtSpeech_Vocal_Tract_Segmentation/1659":
         - S7
         - S8
         - S9

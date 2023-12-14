@@ -18,7 +18,7 @@ sequences:
         - S22
         - S24
         - S31
-    "ArtSpeech_Vocal_Tract_Segmentation_RGB/1662":
+    "ArtSpeech_Vocal_Tract_Segmentation/1662":
         - S7
         - S8
         - S9

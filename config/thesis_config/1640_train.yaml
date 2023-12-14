@@ -29,7 +29,7 @@ train_sequences:
         - S29
         - S30
         - S32
-    "ArtSpeech_Vocal_Tract_Segmentation_RGB/1612":
+    "ArtSpeech_Vocal_Tract_Segmentation/1612":
         - S12
         - S13
         - S14
@@ -41,7 +41,7 @@ train_sequences:
         - S20
         - S21
         - S22
-    "ArtSpeech_Vocal_Tract_Segmentation_RGB/1618":
+    "ArtSpeech_Vocal_Tract_Segmentation/1618":
         - S7
         - S9
         - S12
@@ -53,7 +53,7 @@ train_sequences:
         - S19
         - S20
         - S22
-    "ArtSpeech_Vocal_Tract_Segmentation_RGB/1635":
+    "ArtSpeech_Vocal_Tract_Segmentation/1635":
         - S7
         - S8
         - S10
@@ -65,7 +65,7 @@ train_sequences:
         - S17
         - S18
         - S21
-    "ArtSpeech_Vocal_Tract_Segmentation_RGB/1638":
+    "ArtSpeech_Vocal_Tract_Segmentation/1638":
         - S7
         - S10
         - S12
@@ -77,7 +77,7 @@ train_sequences:
         - S19
         - S21
         - S22
-    "ArtSpeech_Vocal_Tract_Segmentation_RGB/1659":
+    "ArtSpeech_Vocal_Tract_Segmentation/1659":
         - S11
         - S12
         - S14
@@ -88,7 +88,7 @@ train_sequences:
         - S20
         - S21
         - S22
-    "ArtSpeech_Vocal_Tract_Segmentation_RGB/1662":
+    "ArtSpeech_Vocal_Tract_Segmentation/1662":
         - S14
         - S15
         - S17
@@ -102,7 +102,7 @@ valid_sequences:
         - S6
         - S26
 test_sequences:
-    "ArtSpeech_Vocal_Tract_Segmentation_RGB/1640":
+    "ArtSpeech_Vocal_Tract_Segmentation/1640":
         - S10
         - S14
         - S16

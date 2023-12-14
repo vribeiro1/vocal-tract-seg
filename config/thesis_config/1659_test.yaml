@@ -9,7 +9,7 @@ mode: rgb
 size: [136, 136]
 batch_size: 8
 sequences:
-    "ArtSpeech_Vocal_Tract_Segmentation_RGB/1659":
+    "ArtSpeech_Vocal_Tract_Segmentation/1659":
         - S7
         - S8
         - S9
