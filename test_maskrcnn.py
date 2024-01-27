@@ -72,6 +72,11 @@ def main(
         model.load_state_dict(state_dict)
     model.to(device)
 
+    total_parameters = sum(p.numel() for p in model.parameters())
+    print(f"""
+Mask R-CNN -- {total_parameters} parameters
+""")
+
     if not os.path.exists(save_to):
         os.mkdir(save_to)
 

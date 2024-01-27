@@ -199,6 +199,11 @@ def main(
         model.load_state_dict(state_dict)
     model.to(device)
 
+    total_parameters = sum(p.numel() for p in model.parameters())
+    print(f"""
+Mask R-CNN -- {total_parameters} parameters
+""")
+
     optimizer = Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
 
     if scheduler_type == "reduce_on_plateau":
