@@ -1,3 +1,4 @@
+ 
 ####################################################################################################
 #
 # Train a convolutional neural network to perform border segmentation of vocal tract articulators.
@@ -32,6 +33,7 @@ from loss import SoftJaccardBCEWithLogitsLoss
 from settings import *
 
 ex = Experiment()
+print(f"BASE_DIR : {BASE_DIR}")
 fs_observer = FileStorageObserver.create(os.path.join(BASE_DIR, "results"))
 ex.observers.append(fs_observer)
 
@@ -48,11 +50,18 @@ def load_deeplabv3(pretrained, num_classes):
 def load_maskrcnn(pretrained, *args, **kwargs):
     return maskrcnn_resnet50_fpn(pretrained=pretrained)
 
-
+ 
 model_loaders = {
     "maskrcnn": load_maskrcnn,
     "deeplabv3": load_deeplabv3
 }
+
+
+def freeze_batchnorm(model):
+    """Freeze BatchNorm layers by setting them to eval mode."""
+    for module in model.modules():
+        if isinstance(module, nn.BatchNorm2d):
+            module.eval()
 
 
 def run_maskrcnn_epoch(phase, epoch, model, dataloader, optimizer, *args, scheduler=None, writer=None, device=None, **kwargs):
@@ -60,10 +69,13 @@ def run_maskrcnn_epoch(phase, epoch, model, dataloader, optimizer, *args, schedu
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     training = phase == TRAIN
 
-    if training:
-        model.train()
-    else:
-        model.eval()
+    # Reset and display initial GPU memory
+    if device.type == "cuda":
+        torch.cuda.reset_peak_memory_stats(device)
+        allocated_gb = torch.cuda.memory_allocated(device) / 1024**3
+        reserved_gb = torch.cuda.memory_reserved(device) / 1024**3
+        total_gb = torch.cuda.get_device_properties(device).total_memory / 1024**3
+        print(f"\n[{phase} Epoch {epoch}] GPU Memory at start: {allocated_gb:.2f} GB allocated / {total_gb:.2f} GB total")
 
     losses = []
     progress_bar = tqdm(dataloader, desc=f"Epoch {epoch} - {phase}")
@@ -73,8 +85,11 @@ def run_maskrcnn_epoch(phase, epoch, model, dataloader, optimizer, *args, schedu
             k: v.to(device) for k, v in d.items()
         } for d in targets_dict]
 
-        optimizer.zero_grad()
-        with torch.set_grad_enabled(training):
+        if training:
+            # Training phase: use train mode, enable gradients, update weights
+            model.train()
+            optimizer.zero_grad()
+            
             outputs = model(inputs, targets_dict)
             loss = (
                 outputs["loss_classifier"] + \
@@ -83,28 +98,71 @@ def run_maskrcnn_epoch(phase, epoch, model, dataloader, optimizer, *args, schedu
                 outputs["loss_objectness"] + \
                 outputs["loss_rpn_box_reg"]
             )
+            
+            loss.backward()
+            optimizer.step()
 
-            if training:
-                loss.backward()
-                optimizer.step()
-
-                if scheduler is not None:
-                    scheduler.step()
-
-        losses.append({
-            "loss_classifier": outputs["loss_classifier"].item(),
-            "loss_box_reg": outputs["loss_box_reg"].item(),
-            "loss_mask": outputs["loss_mask"].item(),
-            "loss": loss.item()
-        })
+            if scheduler is not None:
+                scheduler.step()
+                
+            losses.append({
+                "loss_classifier": outputs["loss_classifier"].item(),
+                "loss_box_reg": outputs["loss_box_reg"].item(),
+                "loss_mask": outputs["loss_mask"].item(),
+                "loss": loss.item()
+            })
+        else:
+            # Validation phase: use eval mode for inference, 
+            # but temporarily switch to train mode to compute losses
+            # and keep BatchNorm frozen during validation
+            model.eval()
+            
+            with torch.no_grad():
+                # Temporarily switch to train mode to get loss outputs
+                model.train()
+                # Freeze BatchNorm layers to prevent running statistics updates
+                freeze_batchnorm(model)
+                
+                outputs = model(inputs, targets_dict)
+                model.eval()
+                
+                loss = (
+                    outputs["loss_classifier"] + \
+                    outputs["loss_box_reg"] + \
+                    outputs["loss_mask"] + \
+                    outputs["loss_objectness"] + \
+                    outputs["loss_rpn_box_reg"]
+                )
+                
+                losses.append({
+                    "loss_classifier": outputs["loss_classifier"].item(),
+                    "loss_box_reg": outputs["loss_box_reg"].item(),
+                    "loss_mask": outputs["loss_mask"].item(),
+                    "loss": loss.item()
+                })
 
         mean_loss = np.mean([l["loss"] for l in losses])
-        progress_bar.set_postfix(loss=mean_loss)
+        
+        # Update progress bar with loss and GPU memory
+        postfix_dict = {"loss": mean_loss}
+        if device.type == "cuda":
+            gpu_mem_gb = torch.cuda.memory_allocated(device) / 1024**3
+            postfix_dict["GPU_mem"] = f"{gpu_mem_gb:.2f}GB"
+        progress_bar.set_postfix(postfix_dict)
 
     mean_loss = np.mean([l["loss"] for l in losses])
     loss_tag = f"{phase}/loss"
     if writer is not None:
         writer.add_scalar(loss_tag, mean_loss, epoch)
+
+    # Display peak GPU memory usage at end of epoch
+    if device.type == "cuda":
+        peak_allocated_gb = torch.cuda.max_memory_allocated(device) / 1024**3
+        peak_reserved_gb = torch.cuda.max_memory_reserved(device) / 1024**3
+        current_allocated_gb = torch.cuda.memory_allocated(device) / 1024**3
+        total_gb = torch.cuda.get_device_properties(device).total_memory / 1024**3
+        print(f"[{phase} Epoch {epoch}] Peak GPU Memory: {peak_allocated_gb:.2f} GB / {total_gb:.2f} GB total "
+              f"(current: {current_allocated_gb:.2f} GB)")
 
     info = {
         "loss": mean_loss

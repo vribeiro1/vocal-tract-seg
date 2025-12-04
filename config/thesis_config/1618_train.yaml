@@ -2,15 +2,15 @@ model_name: maskrcnn
 scheduler_type: cyclic_lr
 image_folder: NPY_MR
 image_ext: npy
-datadir: /srv/storage/talc3@talc-data.nancy/multispeech/calcul/users/vsouzaribeiro/datasets
+datadir: /srv/storage/talc@storage4.nancy/multispeech/corpus/speech_production/iadi
 mode: rgb
-batch_size: 8
-n_epochs: 500
+batch_size: 16
+n_epochs: 300
 patience: 20
 learning_rate: 0.0001
 weight_decay: 0.001
 size: [136, 136]
-exclusion_list_filepath: /home/vsouzaribeiro/workspace/vocal-tract-seg/config/leave_one_out/swallowing.json
+# exclusion_list_filepath: /home/vsouzaribeiro/workspace/vocal-tract-seg/config/leave_one_out/swallowing.json
 train_sequences:
     "ArtSpeech_Database_2/1775":
         - S8
