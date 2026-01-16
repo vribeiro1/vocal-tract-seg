@@ -15,7 +15,7 @@
 *.stdout
 
 !config/thesis_config/*.yaml
-
+command/*
 .ipynb_checkpoints
 __pycache__
 results*

@@ -1,3 +1,4 @@
+ 
 ####################################################################################################
 #
 # Train a convolutional neural network to perform border segmentation of vocal tract articulators.
@@ -32,6 +33,7 @@ from loss import SoftJaccardBCEWithLogitsLoss
 from settings import *
 
 ex = Experiment()
+print(f"BASE_DIR : {BASE_DIR}")
 fs_observer = FileStorageObserver.create(os.path.join(BASE_DIR, "results"))
 ex.observers.append(fs_observer)
 
@@ -48,7 +50,7 @@ def load_deeplabv3(pretrained, num_classes):
 def load_maskrcnn(pretrained, *args, **kwargs):
     return maskrcnn_resnet50_fpn(pretrained=pretrained)
 
-
+ 
 model_loaders = {
     "maskrcnn": load_maskrcnn,
     "deeplabv3": load_deeplabv3
@@ -60,10 +62,9 @@ def run_maskrcnn_epoch(phase, epoch, model, dataloader, optimizer, *args, schedu
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     training = phase == TRAIN
 
-    if training:
-        model.train()
-    else:
-        model.eval()
+    # Keep model in train mode for Mask R-CNN to compute losses
+    # Gradients will be disabled during validation to prevent weight updates
+    model.train()
 
     losses = []
     progress_bar = tqdm(dataloader, desc=f"Epoch {epoch} - {phase}")

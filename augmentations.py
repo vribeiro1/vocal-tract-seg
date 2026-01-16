@@ -30,6 +30,6 @@ class MultiRandomRotation(transforms.RandomRotation):
     def forward(self, *imgs):
         angle = self.get_params(self.degrees)
         return funcy.lmap(
-            lambda img: F.rotate(img, angle, self.resample, self.expand, self.center, self.fill),
+            lambda img: F.rotate(img, angle, interpolation=self.interpolation, expand=self.expand, center=self.center, fill=self.fill),
             imgs
         )
